@@ -1,0 +1,99 @@
+{
+  "project_info": {
+    "project_number": "231319992486",
+    "firebase_url": "https://iresponde-6a2a7.firebaseio.com",
+    "project_id": "iresponde-6a2a7",
+    "storage_bucket": "iresponde-6a2a7.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:231319992486:android:f0424887b0e53f8a",
+        "android_client_info": {
+          "package_name": "com.example.oteptudlong.irespondecitizen"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "231319992486-skfetp4dg4m6er5tblafgl4af3kfaq46.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.oteptudlong.irespondecitizen",
+            "certificate_hash": "1212cc44115d53aa4c56c82852293708da62e928"
+          }
+        },
+        {
+          "client_id": "231319992486-dsi4sqg9cm0146819h1lhenli37uuvks.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDLq25HONC7iKZKEnHrEp4lofSMfeFND8"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "231319992486-dsi4sqg9cm0146819h1lhenli37uuvks.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:231319992486:android:956508b0217863bc",
+        "android_client_info": {
+          "package_name": "com.example.oteptudlong.irespondepolice"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "231319992486-blce7lj212pnp2n9v4iqf8iirkb0hh2t.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.oteptudlong.irespondepolice",
+            "certificate_hash": "1212cc44115d53aa4c56c82852293708da62e928"
+          }
+        },
+        {
+          "client_id": "231319992486-dsi4sqg9cm0146819h1lhenli37uuvks.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDLq25HONC7iKZKEnHrEp4lofSMfeFND8"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "231319992486-dsi4sqg9cm0146819h1lhenli37uuvks.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
