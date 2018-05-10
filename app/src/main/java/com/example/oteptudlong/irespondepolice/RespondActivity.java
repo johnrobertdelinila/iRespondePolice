@@ -138,6 +138,8 @@ public class RespondActivity
         respondentListener();
         otwListener();
 
+        // DEFAULT: Fake report button and Write report button is hide, Respond button is show
+
     }
 
     private void showFakeConfirmationDialog() {
@@ -219,6 +221,21 @@ public class RespondActivity
             Log.e("ON THE WAY", "NO");
             btn_respond.setText("RESPOND");
             isOnTheWay = false;
+        }
+    }
+
+    private boolean isAlreadyArrived(String currentArrivedIDs) {
+        List<String> ids = Arrays.asList(currentArrivedIDs.split(randomStringSeparator));
+        if (ids.contains(policeUid)) {
+            Log.e("ARRIVED","ALREADY ARRIVED");
+            // Hide respond button
+            // Show Write Report and Fake Report button
+            return true;
+        }else {
+            Log.e("ARRIVED","NOT ARRIVE YET");
+            // Show respond button
+            // Hide Write Report and Fake Report button
+            return false;
         }
     }
 
@@ -462,6 +479,7 @@ public class RespondActivity
         // MAGPAPAKITA UNG WRITE REPORT AT FAKE REPORT BUTTON
         // MAWAWALA UNG REPOND BUTTON
         // PERO DAPAT NASA ON THE WAY SIANG ID MUNA
+        haveArrived();
     }
 
     @Override
@@ -479,29 +497,34 @@ public class RespondActivity
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 if (isOnTheWay != null && isOnTheWay) {
-                    // check pa kung meron na ung id niya sa arrived id para hindi maulit
-                    mCitizenReport.child(report.getKey()).child("arrivedIds").runTransaction(new Transaction.Handler() {
-                        @Override
-                        public Transaction.Result doTransaction(MutableData mutableData) {
-                            String arrived_ids = "null";
-                            if (mutableData.getValue() != null) {
-                                String current_ids = mutableData.getValue(String.class);
-                                arrived_ids = combinePoliceIDs(current_ids, policeUid);
-                            }
-                            mutableData.setValue(arrived_ids);
-                            return Transaction.success(mutableData);
-                        }
 
-                        @Override
-                        public void onComplete(DatabaseError databaseError, boolean b, DataSnapshot dataSnapshot) {
-                            if (databaseError != null) {
-                                Log.e("ERROR", databaseError.getMessage());
-                                Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                            }else {
-                                Toast.makeText(RespondActivity.this, "You have arrived on the incident", Toast.LENGTH_SHORT).show();
+                    // Check kung naka arrived na din sia
+
+                    String currentArrivedIds = dataSnapshot.getValue(String.class);
+                    if (!isAlreadyArrived(currentArrivedIds)) {
+                        mCitizenReport.child(report.getKey()).child("arrivedIds").runTransaction(new Transaction.Handler() {
+                            @Override
+                            public Transaction.Result doTransaction(MutableData mutableData) {
+                                String arrived_ids = "null";
+                                if (mutableData.getValue() != null) {
+                                    String current_ids = mutableData.getValue(String.class);
+                                    arrived_ids = combinePoliceIDs(current_ids, policeUid);
+                                }
+                                mutableData.setValue(arrived_ids);
+                                return Transaction.success(mutableData);
                             }
-                        }
-                    });
+
+                            @Override
+                            public void onComplete(DatabaseError databaseError, boolean b, DataSnapshot dataSnapshot) {
+                                if (databaseError != null) {
+                                    Log.e("ERROR", databaseError.getMessage());
+                                    Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+                                }else {
+                                    Toast.makeText(RespondActivity.this, "You have arrived on the incident", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        });
+                    }
                 }
             }
 
