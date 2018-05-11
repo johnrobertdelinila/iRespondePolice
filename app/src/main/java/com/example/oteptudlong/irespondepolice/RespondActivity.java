@@ -39,6 +39,8 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -88,6 +90,7 @@ public class RespondActivity
     private DatabaseReference mCitizenReport = FirebaseDatabase.getInstance().getReference().child("Citizen Report");
     private DatabaseReference mCitizen = FirebaseDatabase.getInstance().getReference().child("Citizen");
     private DatabaseReference mReportLocation = FirebaseDatabase.getInstance().getReference().child("Report Location");
+    private DatabaseReference mPoliceReport = FirebaseDatabase.getInstance().getReference().child("Police Reports");
     private SpotsDialog loadingDialog;
     private static final String randomStringSeparator = "eISN3K053y";
     private String policeUid = "police_id";
@@ -185,6 +188,7 @@ public class RespondActivity
                 addFakeReport();
             }else {
                 Toast.makeText(this, "Remove the report first", Toast.LENGTH_SHORT).show();
+                removeReport();
                 // show confirmation dialog to remove the report first
                 // if yes
                 // addFakeReport();
@@ -203,6 +207,75 @@ public class RespondActivity
             }
         }
 
+    }
+
+    private void removeReport() {
+        Query query = mPoliceReport.orderByChild("citizen_report_id").equalTo(report.getKey());
+        query.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                for (DataSnapshot childSnapshot: dataSnapshot.getChildren()) {
+                    String report_key = childSnapshot.getKey();
+                    mPoliceReport.child(report_key).removeValue()
+                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                @Override
+                                public void onSuccess(Void aVoid) {
+                                    removeYourID();
+                                }
+                            })
+                            .addOnFailureListener(new OnFailureListener() {
+                                @Override
+                                public void onFailure(@NonNull Exception e) {
+                                    Log.e("REMOVING REPORT ERR", e.getMessage());
+                                }
+                            });
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Log.e("REMOVE REPORT ERR", databaseError.getMessage());
+            }
+        });
+    }
+
+    private void removeYourID() {
+        mCitizenReport.child(report.getKey()).child("police_report_ids")
+                .runTransaction(new Transaction.Handler() {
+                    @Override
+                    public Transaction.Result doTransaction(MutableData mutableData) {
+                        String new_police_id = "null";
+                        if (mutableData.getValue() != null) {
+                            new_police_id = removePoliceID(mutableData.getValue(String.class));
+                        }
+                        mutableData.setValue(new_police_id);
+                        return Transaction.success(mutableData);
+                    }
+
+                    @Override
+                    public void onComplete(DatabaseError databaseError, boolean b, DataSnapshot dataSnapshot) {
+                        if (databaseError == null) {
+                            addFakeReport();
+                        }
+                    }
+                });
+    }
+
+    private String removePoliceID(String currentPoliceID) {
+        String output = currentPoliceID;
+        if (!currentPoliceID.equals("null")) {
+            List<String> police_ids = new ArrayList<>(Arrays.asList(currentPoliceID.split(randomStringSeparator)));
+            for (String police_id: police_ids) {
+                if (police_id.equals(policeUid)) {
+                    police_ids.remove(police_id);
+                    break;
+                }
+            }
+            Log.e("HELLO", String.valueOf(police_ids));
+            output = combineRemainingPoliceID(police_ids);
+        }
+
+        return output;
     }
 
     private void addFakeReport() {
@@ -367,6 +440,23 @@ public class RespondActivity
             output.append(currentPoliceIDs);
             output.append(randomStringSeparator);
             output.append(newPoliceID);
+        }
+        return output.toString();
+    }
+
+    private String combineRemainingPoliceID(List<String> remainingPoliceID) {
+        StringBuilder output = new StringBuilder();
+        if (remainingPoliceID.size() > 0) {
+            for (int i = 0; i < remainingPoliceID.size(); i++) {
+                if (i == remainingPoliceID.size() - 1) {
+                    output.append(remainingPoliceID.get(i));
+                }else {
+                    output.append(remainingPoliceID.get(i));
+                    output.append(randomStringSeparator);
+                }
+            }
+        }else {
+            output.append("null");
         }
         return output.toString();
     }
