@@ -43,8 +43,9 @@
             </intent-filter>
         </activity>
         <activity android:name=".RespondActivity" />
-        <activity android:name=".CoordinatorActivity"></activity>
-        <activity android:name=".PoliceReportActivity"></activity>
+        <activity android:name=".CoordinatorActivity" />
+        <activity android:name=".PoliceReportActivity" />
+        <activity android:name=".ShowReportActivity"></activity>
     </application>
 
 </manifest>

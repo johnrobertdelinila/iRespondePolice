@@ -44,6 +44,7 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.MutableData;
+import com.google.firebase.database.Query;
 import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
 
@@ -108,11 +109,7 @@ public class RespondActivity
         btn_send_report.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(RespondActivity.this, PoliceReportActivity.class);
-                intent.putExtra("key", report.getKey());
-                intent.putExtra("latitude", report.getLatitude());
-                intent.putExtra("longtitude", report.getLongtitude());
-                startActivity(intent);
+                checkIfAlreadyReported(false);
             }
         });
 
@@ -120,7 +117,7 @@ public class RespondActivity
             @Override
             public void onClick(View v) {
 //                showFakeConfirmationDialog();
-                addFakeReport();
+                checkIfAlreadyReported(true);
             }
         });
 
@@ -146,6 +143,22 @@ public class RespondActivity
         AlertDialog.Builder dialog = new AlertDialog.Builder(this);
     }
 
+    private void checkIfAlreadyReported(final boolean isFakeReport) {
+        mCitizenReport.child(report.getKey()).child("police_report_ids")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(DataSnapshot dataSnapshot) {
+                        String currentPoliceIds = dataSnapshot.getValue(String.class);
+                        extractPoliceId(currentPoliceIds, isFakeReport);
+                    }
+
+                    @Override
+                    public void onCancelled(DatabaseError databaseError) {
+                        Log.e("CHECK REPORTED ERR", databaseError.getMessage());
+                    }
+                });
+    }
+
     private void respondentListener() {
         GeoFire geoFire = new GeoFire(mReportLocation.child("-LBeUnsrKqaT8Oyp53c_"));
         GeoLocation geoLocation = new GeoLocation(report.getLatitude(), report.getLongtitude());
@@ -153,6 +166,43 @@ public class RespondActivity
         geoQuery.addGeoQueryEventListener(this);
 
         Log.e("LOCATION OF INCIDENT", String.valueOf(geoLocation));
+    }
+
+    private void extractPoliceId(String currentPoliceId, boolean isFakeReport) {
+        boolean writeReport = true;
+        if (!currentPoliceId.equals("null")) {
+            List<String> police_ids = Arrays.asList(currentPoliceId.split(randomStringSeparator));
+            for (String police_id: police_ids) {
+                if (police_id.equals(policeUid)) {
+                    // show report
+                    writeReport = false;
+                    break;
+                }
+            }
+        }
+        if (isFakeReport) {
+            if (writeReport) {
+                addFakeReport();
+            }else {
+                Toast.makeText(this, "Remove the report first", Toast.LENGTH_SHORT).show();
+                // show confirmation dialog to remove the report first
+                // if yes
+                // addFakeReport();
+            }
+        }else {
+            if (writeReport) {
+                Intent intent = new Intent(RespondActivity.this, PoliceReportActivity.class);
+                intent.putExtra("key", report.getKey());
+                intent.putExtra("latitude", report.getLatitude());
+                intent.putExtra("longtitude", report.getLongtitude());
+                startActivity(intent);
+            }else {
+                // show report
+                Intent intent = new Intent(RespondActivity.this, ShowReportActivity.class);
+                startActivity(intent);
+            }
+        }
+
     }
 
     private void addFakeReport() {
@@ -177,8 +227,29 @@ public class RespondActivity
                             Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
                             Log.e("FAKE REPORT ERR", databaseError.getMessage());
                         }else {
-                            loadingDialog.dismiss();
-                            Toast.makeText(RespondActivity.this, "Considered as fake news", Toast.LENGTH_SHORT).show();
+                            // update citizen report
+                            mCitizenReport.child(report.getKey()).child("status")
+                                    .runTransaction(new Transaction.Handler() {
+                                        @Override
+                                        public Transaction.Result doTransaction(MutableData mutableData) {
+                                            String new_status = "pending";
+                                            if (mutableData.getValue() != null) {
+                                                new_status = "faked";
+                                            }
+                                            mutableData.setValue(new_status);
+                                            return Transaction.success(mutableData);
+                                        }
+
+                                        @Override
+                                        public void onComplete(DatabaseError databaseError, boolean b, DataSnapshot dataSnapshot) {
+                                            if (databaseError != null) {
+                                                Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+                                            }else {
+                                                loadingDialog.dismiss();
+                                                Toast.makeText(RespondActivity.this, "Considered as fake news", Toast.LENGTH_SHORT).show();
+                                            }
+                                        }
+                                    });
                         }
                     }
                 });
