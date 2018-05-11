@@ -79,14 +79,14 @@ public class PoliceReportActivity extends AppCompatActivity {
                 // date
 
                 loadingDialog.show();
-                insertReport(str_action, str_case_no, str_witness, str_detail);
+                insertReport(str_action, str_case_no, str_witness, str_detail, str_incident);
 
             }
         });
 
     }
 
-    private void insertReport(String str_action, String str_case_no, String str_witness, String str_detail) {
+    private void insertReport(String str_action, String str_case_no, String str_witness, String str_detail, String str_incident) {
         String time = DateFormat.getTimeInstance().format(new Date());
         String date = DateFormat.getDateInstance().format(new Date());
 
@@ -101,6 +101,7 @@ public class PoliceReportActivity extends AppCompatActivity {
         policeReport.setWitness(str_witness);
         policeReport.setDetail_of_event(str_detail);
         policeReport.setPolice_id("random_police_id");
+        policeReport.setIncident(str_incident);
 
         final String futureKey = mPoliceReport.child("futureKey").push().getKey();
 
