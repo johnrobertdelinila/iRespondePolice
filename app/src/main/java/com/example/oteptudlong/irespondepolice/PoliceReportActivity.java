@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import dmax.dialog.SpotsDialog;
 
@@ -34,7 +35,7 @@ public class PoliceReportActivity extends AppCompatActivity {
     private EditText case_no, incident, detail_of_event, actions_taken, witness;
     private Button btn_submit;
     private DatabaseReference mPoliceReport = FirebaseDatabase.getInstance().getReference().child("Police Reports");
-    private DatabaseReference mCitizenReport = FirebaseDatabase.getInstance().getReference().child("Citizen Report");
+    private DatabaseReference mCitizenReport = FirebaseDatabase.getInstance().getReference().child("Citizen Reports");
     public String citizen_report_id;
     public Double latitude, longtitude;
     private SpotsDialog loadingDialog;
@@ -75,9 +76,6 @@ public class PoliceReportActivity extends AppCompatActivity {
                     return;
                 }
 
-                // citizen report id
-                // date
-
                 loadingDialog.show();
                 insertReport(str_action, str_case_no, str_witness, str_detail, str_incident);
 
@@ -90,6 +88,8 @@ public class PoliceReportActivity extends AppCompatActivity {
         String time = DateFormat.getTimeInstance().format(new Date());
         String date = DateFormat.getDateInstance().format(new Date());
 
+        // TODO: Get the proper Police UID
+
         PoliceReport policeReport = new PoliceReport();
         policeReport.setActions_taken(str_action);
         policeReport.setCase_no(str_case_no);
@@ -100,70 +100,60 @@ public class PoliceReportActivity extends AppCompatActivity {
         policeReport.setCitizen_report_id(citizen_report_id);
         policeReport.setWitness(str_witness);
         policeReport.setDetail_of_event(str_detail);
-        policeReport.setPolice_id("random_police_id");
+        policeReport.setPolice_id(policeUid);
         policeReport.setIncident(str_incident);
 
-        final String futureKey = mPoliceReport.child("futureKey").push().getKey();
+        mPoliceReport.push().setValue(policeReport, new DatabaseReference.CompletionListener() {
+            @Override
+            public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
+                if (databaseError == null) {
+                    insertPoliceReportID(databaseReference.getKey());
+                }else {
+                    loadingDialog.dismiss();
+                    Toast.makeText(PoliceReportActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
 
-        mPoliceReport.child(futureKey).setValue(policeReport)
+    private void insertPoliceReportID(String policeReportID) {
+        Map<String, Object> policeReport = new HashMap<>();
+        policeReport.put(policeUid, policeReportID);
+        mCitizenReport.child(citizen_report_id).child("policeReports").updateChildren(policeReport)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     @Override
                     public void onSuccess(Void aVoid) {
-                        updatePoliceReportIDs();
+                        updateReportStatus();
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(@NonNull Exception e) {
                         loadingDialog.dismiss();
-                        Log.e("POLICE REPORT ERR", e.getMessage());
+                        Toast.makeText(PoliceReportActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 });
     }
 
-    private void updatePoliceReportIDs() {
-        mCitizenReport.child(citizen_report_id)
-                .runTransaction(new Transaction.Handler() {
+    private void updateReportStatus() {
+        HashMap<String, Object> status = new HashMap<>();
+        status.put("status", "resolved");
+        mCitizenReport.child(citizen_report_id).updateChildren(status)
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
                     @Override
-                    public Transaction.Result doTransaction(MutableData mutableData) {
-                        String new_police_ids = "null";
-                        String new_status = "pending";
-                        if (mutableData.getValue() != null) {
-                            String currentPoliceIDs = mutableData.child("police_report_ids").getValue(String.class);
-                            new_status = "resolved";
-                            new_police_ids = combinePoliceIDs(currentPoliceIDs, policeUid);
-                        }
-
-                        mutableData.child("police_report_ids").setValue(new_police_ids);
-                        mutableData.child("status").setValue(new_status);
-                        return Transaction.success(mutableData);
+                    public void onSuccess(Void aVoid) {
+                        loadingDialog.dismiss();
+                        Toast.makeText(PoliceReportActivity.this, "Report has been successfully inserted", Toast.LENGTH_SHORT).show();
+                        finish();
                     }
-
+                })
+                .addOnFailureListener(new OnFailureListener() {
                     @Override
-                    public void onComplete(DatabaseError databaseError, boolean b, DataSnapshot dataSnapshot) {
-                        if (databaseError != null) {
-                            loadingDialog.dismiss();
-                            Toast.makeText(PoliceReportActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                            Log.e("MUTABLE ERR", databaseError.getMessage());
-                        }else {
-                            loadingDialog.dismiss();
-                            Toast.makeText(PoliceReportActivity.this, "Successfully added!", Toast.LENGTH_SHORT).show();
-                            finish();
-                        }
+                    public void onFailure(@NonNull Exception e) {
+                        loadingDialog.dismiss();
+                        Toast.makeText(PoliceReportActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 });
-    }
-
-    private String combinePoliceIDs(String currentPoliceIDs, String newPoliceID){
-        StringBuilder output = new StringBuilder();
-        if (currentPoliceIDs.equals("null")) {
-            output.append(newPoliceID);
-        }else {
-            output.append(currentPoliceIDs);
-            output.append(randomStringSeparator);
-            output.append(newPoliceID);
-        }
-        return output.toString();
     }
 
     private void init() {

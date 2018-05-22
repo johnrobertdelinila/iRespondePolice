@@ -9,45 +9,60 @@ import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import com.firebase.ui.database.FirebaseRecyclerAdapter;
 import com.firebase.ui.database.FirebaseRecyclerOptions;
+import com.firebase.ui.database.SnapshotParser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 
 public class HomeActivity extends AppCompatActivity {
 
-    public RecyclerView firebaseRecycler;
-    public FirebaseRecyclerAdapter adapter;
+    private RecyclerView firebaseRecycler;
+    private FirebaseRecyclerAdapter mFirebaseAdapter;
+    private DatabaseReference mCitizenReport = FirebaseDatabase.getInstance().getReference().child("Citizen Reports");
+    private LinearLayoutManager mLinearLayout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        // get the reports using firebase recyclerview
-
-        firebaseRecycler = findViewById(R.id.firebaseRecyclerview);
-        firebaseRecycler.setHasFixedSize(true);
-        firebaseRecycler.setLayoutManager(new LinearLayoutManager(this));
-
-        Query query = FirebaseDatabase.getInstance().getReference()
-                .child("Citizen Report");
+        SnapshotParser<Report> parser = new SnapshotParser<Report>() {
+            @NonNull
+            @Override
+            public Report parseSnapshot(@NonNull DataSnapshot snapshot) {
+                Report report = snapshot.getValue(Report.class);
+                if (report != null) {
+                    report.setKey(snapshot.getKey());
+                }
+                return report;
+            }
+        };
 
         FirebaseRecyclerOptions<Report> options = new FirebaseRecyclerOptions.Builder<Report>()
-                .setQuery(query, Report.class)
+                .setQuery(mCitizenReport, parser)
                 .build();
+        // TODO: Show Resolved Reports in UI
+        // TODO: Add Progress Dialog
+        // Initialize RecyclerView
+        firebaseRecycler = findViewById(R.id.firebaseRecyclerview);
+        mLinearLayout = new LinearLayoutManager(this);
+        firebaseRecycler.setLayoutManager(mLinearLayout);
 
-        adapter = new FirebaseRecyclerAdapter<Report, ReportHolder>(options) {
-
+        mFirebaseAdapter = new FirebaseRecyclerAdapter<Report, ReportHolder>(options) {
+            @NonNull
             @Override
-            public ReportHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            public ReportHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
                 View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.layout_report, parent, false);
                 return new ReportHolder(view);
             }
 
             @Override
-            protected void onBindViewHolder(ReportHolder holder, int position, Report model) {
+            protected void onBindViewHolder(@NonNull ReportHolder holder, int position, @NonNull Report model) {
 
                 holder.textView.setText(model.getIncident());
                 final Report report = model;
@@ -63,20 +78,32 @@ public class HomeActivity extends AppCompatActivity {
             }
         };
 
-
-        firebaseRecycler.setAdapter(adapter);
+        firebaseRecycler.setAdapter(mFirebaseAdapter);
 
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        adapter.startListening();
+        // Check if the user is signed in.
+        // TODO: Add code to check if the user is signed in.
+    }
+
+    @Override
+    protected void onPause() {
+        mFirebaseAdapter.stopListening();
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mFirebaseAdapter.startListening();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        adapter.stopListening();
+        mFirebaseAdapter.stopListening();
     }
 }

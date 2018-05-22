@@ -1,6 +1,9 @@
 package com.example.oteptudlong.irespondepolice;
 
-public class PoliceReport {
+import java.io.Serializable;
+
+@SuppressWarnings("serial")
+public class PoliceReport implements Serializable {
 
     private String date, time, case_no, incident, citizen_report_id, witness, detail_of_event, actions_taken, police_id;
     private Double latitude, longtitude;
