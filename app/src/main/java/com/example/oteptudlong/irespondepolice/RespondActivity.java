@@ -75,10 +75,12 @@ public class RespondActivity
     public Report report;
     private static final int PERMISSION_REQUEST_CODE = 1996;
     private static final int GOOGLE_PLAY_SERVICES_REQUEST_CODE = 1997;
+    private static final String TAG = "RespondActivity";
 
     private GoogleApiClient googleApiClient;
     private LocationRequest locationRequest;
     private Location mLastLocation;
+    private LatLng destination;
 
     private Marker markerOrigin, markerDest;
     private Polyline polyline;
@@ -87,14 +89,13 @@ public class RespondActivity
     public BottomSheetBehavior bottomSheetBehavior;
 
     public Button btn_send_report, btn_fake_report, btn_respond;
-    private DatabaseReference mCitizenReport = FirebaseDatabase.getInstance().getReference().child("Citizen Report");
-    private DatabaseReference mCitizen = FirebaseDatabase.getInstance().getReference().child("Citizen");
-    private DatabaseReference mReportLocation = FirebaseDatabase.getInstance().getReference().child("Report Location");
+    private DatabaseReference mCitizenReport = FirebaseDatabase.getInstance().getReference().child("Citizen Reports");
+    private DatabaseReference mCitizen = FirebaseDatabase.getInstance().getReference().child("Citizens");
     private DatabaseReference mPoliceReport = FirebaseDatabase.getInstance().getReference().child("Police Reports");
+    private DatabaseReference mPoliceLocation = FirebaseDatabase.getInstance().getReference().child("Police Locations");
+    private GeoFire geoPoliceLocation;
     private SpotsDialog loadingDialog;
-    private static final String randomStringSeparator = "eISN3K053y";
     private String policeUid = "police_id";
-    private Boolean isOnTheWay = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -106,226 +107,44 @@ public class RespondActivity
         mapFragment.getMapAsync(this);
 
         init();
+        setUpLocation();
 
         bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
 
         btn_send_report.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                checkIfAlreadyReported(false);
+                checkPoliceReportForSending();
             }
         });
-
         btn_fake_report.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-//                showFakeConfirmationDialog();
-                checkIfAlreadyReported(true);
+                checkPoliceReportForFake();
             }
         });
-
         btn_respond.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                willRespond();
+                policeRespond("on the way");
             }
         });
 
-        Log.e("CITIZEN ID", report.getUid());
+        // Listeners
+        policeRespondentListener();
+        checkPoliceRespond();
+        checkPoliceReportForButton();
 
-        setUpLocation();
-//        buttonListener();
-        respondentListener();
-        otwListener();
-
-        // DEFAULT: Fake report button and Write report button is hide, Respond button is show
+        // TODO: Fake report button and Write report button is hide, Respond button is show
 
     }
 
-    private void showFakeConfirmationDialog() {
-        AlertDialog.Builder dialog = new AlertDialog.Builder(this);
-    }
-
-    private void checkIfAlreadyReported(final boolean isFakeReport) {
-        mCitizenReport.child(report.getKey()).child("police_report_ids")
-                .addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(DataSnapshot dataSnapshot) {
-                        String currentPoliceIds = dataSnapshot.getValue(String.class);
-                        extractPoliceId(currentPoliceIds, isFakeReport);
-                    }
-
-                    @Override
-                    public void onCancelled(DatabaseError databaseError) {
-                        Log.e("CHECK REPORTED ERR", databaseError.getMessage());
-                    }
-                });
-    }
-
-    private void respondentListener() {
-        GeoFire geoFire = new GeoFire(mReportLocation.child("-LBeUnsrKqaT8Oyp53c_"));
-        GeoLocation geoLocation = new GeoLocation(report.getLatitude(), report.getLongtitude());
-        GeoQuery geoQuery = geoFire.queryAtLocation(geoLocation, 0.6);
+    private void policeRespondentListener() {
+        GeoLocation geoLocation = new GeoLocation(report.getLocation_latlng().get("latitude"), report.getLocation_latlng().get("longtitude"));
+        GeoQuery geoQuery = geoPoliceLocation.queryAtLocation(geoLocation, 0.6);
         geoQuery.addGeoQueryEventListener(this);
 
-        Log.e("LOCATION OF INCIDENT", String.valueOf(geoLocation));
-    }
-
-    private void extractPoliceId(String currentPoliceId, boolean isFakeReport) {
-        boolean writeReport = true;
-        if (!currentPoliceId.equals("null")) {
-            List<String> police_ids = Arrays.asList(currentPoliceId.split(randomStringSeparator));
-            for (String police_id: police_ids) {
-                if (police_id.equals(policeUid)) {
-                    // show report
-                    writeReport = false;
-                    break;
-                }
-            }
-        }
-        if (isFakeReport) {
-            if (writeReport) {
-                addFakeReport();
-            }else {
-                Toast.makeText(this, "Remove the report first", Toast.LENGTH_SHORT).show();
-                removeReport();
-                // show confirmation dialog to remove the report first
-                // if yes
-                // addFakeReport();
-            }
-        }else {
-            if (writeReport) {
-                Intent intent = new Intent(RespondActivity.this, PoliceReportActivity.class);
-                intent.putExtra("key", report.getKey());
-                intent.putExtra("latitude", report.getLatitude());
-                intent.putExtra("longtitude", report.getLongtitude());
-                startActivity(intent);
-            }else {
-                // show report
-                Intent intent = new Intent(RespondActivity.this, ShowReportActivity.class);
-                startActivity(intent);
-            }
-        }
-
-    }
-
-    private void removeReport() {
-        Query query = mPoliceReport.orderByChild("citizen_report_id").equalTo(report.getKey());
-        query.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                for (DataSnapshot childSnapshot: dataSnapshot.getChildren()) {
-                    String report_key = childSnapshot.getKey();
-                    mPoliceReport.child(report_key).removeValue()
-                            .addOnSuccessListener(new OnSuccessListener<Void>() {
-                                @Override
-                                public void onSuccess(Void aVoid) {
-                                    removeYourID();
-                                }
-                            })
-                            .addOnFailureListener(new OnFailureListener() {
-                                @Override
-                                public void onFailure(@NonNull Exception e) {
-                                    Log.e("REMOVING REPORT ERR", e.getMessage());
-                                }
-                            });
-                }
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                Log.e("REMOVE REPORT ERR", databaseError.getMessage());
-            }
-        });
-    }
-
-    private void removeYourID() {
-        mCitizenReport.child(report.getKey()).child("police_report_ids")
-                .runTransaction(new Transaction.Handler() {
-                    @Override
-                    public Transaction.Result doTransaction(MutableData mutableData) {
-                        String new_police_id = "null";
-                        if (mutableData.getValue() != null) {
-                            new_police_id = removePoliceID(mutableData.getValue(String.class));
-                        }
-                        mutableData.setValue(new_police_id);
-                        return Transaction.success(mutableData);
-                    }
-
-                    @Override
-                    public void onComplete(DatabaseError databaseError, boolean b, DataSnapshot dataSnapshot) {
-                        if (databaseError == null) {
-                            addFakeReport();
-                        }
-                    }
-                });
-    }
-
-    private String removePoliceID(String currentPoliceID) {
-        String output = currentPoliceID;
-        if (!currentPoliceID.equals("null")) {
-            List<String> police_ids = new ArrayList<>(Arrays.asList(currentPoliceID.split(randomStringSeparator)));
-            for (String police_id: police_ids) {
-                if (police_id.equals(policeUid)) {
-                    police_ids.remove(police_id);
-                    break;
-                }
-            }
-            Log.e("HELLO", String.valueOf(police_ids));
-            output = combineRemainingPoliceID(police_ids);
-        }
-
-        return output;
-    }
-
-    private void addFakeReport() {
-        loadingDialog.show();
-        mCitizen.child(report.getUid()).child("fake_reports")
-                .runTransaction(new Transaction.Handler() {
-                    @Override
-                    public Transaction.Result doTransaction(MutableData mutableData) {
-                        int fake_reports = 0;
-                        if (mutableData.getValue() != null) {
-                            fake_reports = mutableData.getValue(int.class);
-                        }
-                        fake_reports++;
-                        mutableData.setValue(fake_reports);
-                        return Transaction.success(mutableData);
-                    }
-
-                    @Override
-                    public void onComplete(DatabaseError databaseError, boolean isComplete, DataSnapshot dataSnapshot) {
-                        if (databaseError != null) {
-                            loadingDialog.dismiss();
-                            Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                            Log.e("FAKE REPORT ERR", databaseError.getMessage());
-                        }else {
-                            // update citizen report
-                            mCitizenReport.child(report.getKey()).child("status")
-                                    .runTransaction(new Transaction.Handler() {
-                                        @Override
-                                        public Transaction.Result doTransaction(MutableData mutableData) {
-                                            String new_status = "pending";
-                                            if (mutableData.getValue() != null) {
-                                                new_status = "faked";
-                                            }
-                                            mutableData.setValue(new_status);
-                                            return Transaction.success(mutableData);
-                                        }
-
-                                        @Override
-                                        public void onComplete(DatabaseError databaseError, boolean b, DataSnapshot dataSnapshot) {
-                                            if (databaseError != null) {
-                                                Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                                            }else {
-                                                loadingDialog.dismiss();
-                                                Toast.makeText(RespondActivity.this, "Considered as fake news", Toast.LENGTH_SHORT).show();
-                                            }
-                                        }
-                                    });
-                        }
-                    }
-                });
+        Log.e("Location of Incident", String.valueOf(geoLocation));
     }
 
     private void init() {
@@ -336,129 +155,199 @@ public class RespondActivity
         btn_fake_report = findViewById(R.id.btn_fake_report);
         loadingDialog = new SpotsDialog(this);
         btn_respond = findViewById(R.id.btn_respond);
+        geoPoliceLocation = new GeoFire(mPoliceLocation.child(policeUid));
+        destination = new LatLng(report.getLocation_latlng().get("latitude"), report.getLocation_latlng().get("longtitude"));
     }
 
-    private void otwListener() {
-        mCitizenReport.child(report.getKey()).child("otwIds").addValueEventListener(new ValueEventListener() {
+    private void checkPoliceReportForSending() {
+        mCitizenReport.child(report.getKey()).child("policeReports").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                String otw_ids = dataSnapshot.getValue(String.class);
-                if (otw_ids != null) {
-                    checkOtwIDs(otw_ids);
+
+                if (dataSnapshot.hasChild(policeUid)) {
+                    for (DataSnapshot childSnapshot: dataSnapshot.getChildren()) {
+                        if (childSnapshot.getKey().equals(policeUid)) {
+                            String policeReportID = childSnapshot.getValue(String.class);
+                            fetchPoliceReport(policeReportID);
+                            break;
+                        }
+                    }
+                }else {
+                    Intent intent = new Intent(RespondActivity.this, PoliceReportActivity.class);
+                    Bundle bundle = new Bundle();
+                    bundle.putString("key", report.getKey());
+                    bundle.putDouble("latitude", (Double) report.getLocation_latlng().get("latitude"));
+                    bundle.putDouble("longtitude", (Double) report.getLocation_latlng().get("longtitude"));
+                    intent.putExtras(bundle);
+                    startActivity(intent);
                 }
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
-                Log.e("OTW LISTENER err", databaseError.getMessage());
+                Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    private void checkOtwIDs(String otwIDs) {
-        List<String> ids = Arrays.asList(otwIDs.split(randomStringSeparator));
-        if (ids.contains(policeUid)) {
-            Log.e("ON THE WAY", "YES");
-            btn_respond.setText("RESPONDING...");
-            isOnTheWay = true;
-        }else {
-            Log.e("ON THE WAY", "NO");
-            btn_respond.setText("RESPOND");
-            isOnTheWay = false;
-        }
-    }
-
-    private boolean isAlreadyArrived(String currentArrivedIDs) {
-        List<String> ids = Arrays.asList(currentArrivedIDs.split(randomStringSeparator));
-        if (ids.contains(policeUid)) {
-            Log.e("ARRIVED","ALREADY ARRIVED");
-            // Hide respond button
-            // Show Write Report and Fake Report button
-            return true;
-        }else {
-            Log.e("ARRIVED","NOT ARRIVE YET");
-            // Show respond button
-            // Hide Write Report and Fake Report button
-            return false;
-        }
-    }
-
-    private void buttonListener() {
-        mCitizenReport.child(report.getKey()).child("status").addValueEventListener(new ValueEventListener() {
+    private void checkPoliceReportForFake() {
+        mCitizenReport.child(report.getKey()).child("policeReports").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                String status = dataSnapshot.getValue(String.class);
-                if (status != null) {
-                    if (status.equals("resolved")) {
-                        btn_send_report.setText("VIEW REPORT");
-                    }else if (status.equals("pending")) {
-                        btn_send_report.setText("WRITE REPORT");
-                    }
+                if (dataSnapshot.hasChild(policeUid)) {
+                    // Already sended a report
+                    // Ask first to remove the current police report
+                    // TODO: Alert Dialog the confirmation to remove the report
+                    showDeletePoliceReport(dataSnapshot);
+                }else {
+                    updateReportStatus();
                 }
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
-                Log.e("BTN_LISTENER ERR", databaseError.getMessage());
+
             }
         });
     }
 
-    private void willRespond() {
-        loadingDialog.show();
-        mCitizenReport.child(report.getKey()).child("otwIds")
-                .runTransaction(new Transaction.Handler() {
-                    @Override
-                    public Transaction.Result doTransaction(MutableData mutableData) {
-                        String otwIds = "null";
-                        if (mutableData.getValue() != null) {
-                            otwIds = combinePoliceIDs(mutableData.getValue(String.class), policeUid);
-                        }
-                        mutableData.setValue(otwIds);
-                        return Transaction.success(mutableData);
-                    }
+    private void showDeletePoliceReport(DataSnapshot dataSnapshot) {
+        for (DataSnapshot childSnapshot: dataSnapshot.getChildren()) {
+            if (childSnapshot.getKey().equals(policeUid)) {
+                String policeReportID = childSnapshot.getValue(String.class);
+                removePoliceReport(policeReportID);
+                break;
+            }
+        }
+    }
 
+    private void updateReportStatus() {
+        HashMap<String, Object> status = new HashMap<>();
+        status.put("status", "faked");
+        mCitizenReport.child(report.getKey()).updateChildren(status)
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
                     @Override
-                    public void onComplete(DatabaseError databaseError, boolean b, DataSnapshot dataSnapshot) {
-                        if (databaseError != null) {
-                            loadingDialog.dismiss();
-                            Log.e("ERRor", databaseError.getMessage());
-                            Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                        }else {
-                            loadingDialog.dismiss();
-                            Toast.makeText(RespondActivity.this, "Your are now currently responding to the incident", Toast.LENGTH_SHORT).show();
-                        }
+                    public void onSuccess(Void aVoid) {
+                        Toast.makeText(RespondActivity.this, "Considered as fake report.", Toast.LENGTH_SHORT).show();
+                        // Add fake report to citizen
+//                        mCitizen.child(report.getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
+//                            @Override
+//                            public void onDataChange(DataSnapshot dataSnapshot) {
+//                                if (dataSnapshot.hasChild("fakeReports")) {
+//
+//                                }
+//                            }
+//
+//                            @Override
+//                            public void onCancelled(DatabaseError databaseError) {
+//
+//                            }
+//                        });
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+
                     }
                 });
     }
 
-    private String combinePoliceIDs(String currentPoliceIDs, String newPoliceID){
-        StringBuilder output = new StringBuilder();
-        if (currentPoliceIDs.equals("null")) {
-            output.append(newPoliceID);
-        }else {
-            output.append(currentPoliceIDs);
-            output.append(randomStringSeparator);
-            output.append(newPoliceID);
-        }
-        return output.toString();
+    private void removePoliceReport(String policeReportID) {
+        mPoliceReport.child(policeReportID).removeValue()
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        mCitizenReport.child(report.getKey()).child("policeReports").child(policeUid).removeValue()
+                                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                    @Override
+                                    public void onSuccess(Void aVoid) {
+                                        updateReportStatus();
+                                    }
+                                })
+                                .addOnFailureListener(new OnFailureListener() {
+                                    @Override
+                                    public void onFailure(@NonNull Exception e) {
+
+                                    }
+                                });
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Toast.makeText(RespondActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
-    private String combineRemainingPoliceID(List<String> remainingPoliceID) {
-        StringBuilder output = new StringBuilder();
-        if (remainingPoliceID.size() > 0) {
-            for (int i = 0; i < remainingPoliceID.size(); i++) {
-                if (i == remainingPoliceID.size() - 1) {
-                    output.append(remainingPoliceID.get(i));
-                }else {
-                    output.append(remainingPoliceID.get(i));
-                    output.append(randomStringSeparator);
+    private void fetchPoliceReport(String policeReportID) {
+        mPoliceReport.child(policeReportID).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                PoliceReport policeReport = dataSnapshot.getValue(PoliceReport.class);
+                if (policeReport != null) {
+                    Intent intent = new Intent(RespondActivity.this, ShowReportActivity.class);
+                    intent.putExtra("policeReport", policeReport);
+                    startActivity(intent);
                 }
             }
-        }else {
-            output.append("null");
-        }
-        return output.toString();
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+    }
+
+    private void checkPoliceReportForButton() {
+        mCitizenReport.child(report.getKey()).child("policeReports").addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (dataSnapshot.hasChild(policeUid)) {
+                    btn_send_report.setText("VIEW REPORT");
+                }else {
+                    btn_send_report.setText("WRITE REPORT");
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+    }
+
+    private void checkPoliceRespond() {
+        mCitizenReport.child(report.getKey()).child("policeRespondee").addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (dataSnapshot.hasChild(policeUid)) {
+                    for (DataSnapshot childSnapshot: dataSnapshot.getChildren()) {
+                        // Check if your already on the way
+                        // TODO: Must get your own UID
+                        if (childSnapshot.getKey().equals(policeUid)) {
+                            // Police is on the way
+                            String policeRespond = childSnapshot.child("police_respond").getValue(String.class);
+                            btn_respond.setText("RESPONDING...");
+                            Log.e("YOUR RESPOND", policeRespond);
+                            if (policeRespond.equals("arrived")) {
+                                // TODO: Hide the Respond Button and Show the Write and Fake Button
+                            }
+                            break;
+                        }
+                    }
+                }else {
+                    btn_respond.setText("RESPOND");
+                    // TODO: Hide the Show and Write Button and Show the Respond Button
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void setUpLocation() {
@@ -513,6 +402,18 @@ public class RespondActivity
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
+        MarkerOptions markerOptionsDest = new MarkerOptions();
+        markerOptionsDest.position(destination);
+        markerOptionsDest.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
+        markerOptionsDest.title(report.getIncident());
+        markerDest = mMap.addMarker(markerOptionsDest);
+
+        mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(LatLng latLng) {
+                bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+            }
+        });
 
     }
 
@@ -531,33 +432,37 @@ public class RespondActivity
         }
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
         if (mLastLocation != null) {
-            if (markerOrigin != null) {
-                markerOrigin.remove();
-            }
 
-            LatLng origin = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
+            final LatLng origin = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
 
-            MarkerOptions markerOptions = new MarkerOptions();
-            markerOptions.position(origin);
-            markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
-            markerOptions.title("Your location");
-            markerOrigin = mMap.addMarker(markerOptions);
+            geoPoliceLocation.setLocation("Sakurako Oharo", new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()), new GeoFire.CompletionListener() {
+                @Override
+                public void onComplete(String key, DatabaseError error) {
 
-            if (markerDest != null) {
-                markerDest.remove();
-            }
-            LatLng dest = new LatLng(report.getLatitude(), report.getLongtitude());
-            MarkerOptions markerOptionsDest = new MarkerOptions();
-            markerOptionsDest.position(dest);
-            markerOptionsDest.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
-            markerOptionsDest.title("Your Destination");
-            markerDest = mMap.addMarker(markerOptionsDest);
+                    if (error == null) {
 
-            String url = getUrl(origin, dest);
-            FetchUrl FetchUrl = new FetchUrl();
-            FetchUrl.execute(url);
+                        MarkerOptions markerOptions = new MarkerOptions();
+                        markerOptions.position(origin);
+                        markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
+                        markerOptions.title("Your location");
 
-            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(origin, 17.0f));
+                        if (markerOrigin != null) {
+                            markerOrigin.remove();
+                        }
+                        markerOrigin = mMap.addMarker(markerOptions);
+
+                        String url = getUrl(origin, destination);
+                        FetchUrl FetchUrl = new FetchUrl();
+                        FetchUrl.execute(url);
+
+                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(origin, 17.0f));
+
+                    }else {
+                        Toast.makeText(RespondActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+
+                }
+            });
 
         }
     }
@@ -623,10 +528,7 @@ public class RespondActivity
     @Override
     public void onKeyEntered(String key, GeoLocation location) {
         Log.e("ENTERED", "ENTERED");
-        // MAGPAPAKITA UNG WRITE REPORT AT FAKE REPORT BUTTON
-        // MAWAWALA UNG REPOND BUTTON
-        // PERO DAPAT NASA ON THE WAY SIANG ID MUNA
-        haveArrived();
+        arriveRespond();
     }
 
     @Override
@@ -637,15 +539,12 @@ public class RespondActivity
     @Override
     public void onKeyMoved(String key, GeoLocation location) {
         Log.e("MOVED", "MOVED");
-        // MAGPAPAKITA UNG WRITE REPORT AT FAKE REPORT BUTTON
-        // MAWAWALA UNG REPOND BUTTON
-        // PERO DAPAT NASA ON THE WAY SIANG ID MUNA
-        haveArrived();
+        arriveRespond();
     }
 
     @Override
     public void onGeoQueryReady() {
-        Toast.makeText(this, "OKAY!", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "GeoQueryReady!", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -653,45 +552,71 @@ public class RespondActivity
         Log.e("GEO ERROR", error.getMessage());
     }
 
-    private void haveArrived() {
-        mCitizenReport.child(report.getKey()).child("arrivedIds").addValueEventListener(new ValueEventListener() {
+    private void arriveRespond() {
+        // Check first if the police is already responding
+        mCitizenReport.child(report.getKey()).child("policeRespondee")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(DataSnapshot dataSnapshot) {
+                        if (dataSnapshot.hasChild(policeUid)) {
+                            // Police is on the way
+                            // Update it in arrived
+                            policeRespond("arrived");
+                        }
+                    }
+
+                    @Override
+                    public void onCancelled(DatabaseError databaseError) {
+
+                    }
+                });
+    }
+
+    private void sendRespond(final String status) {
+        // TODO: Get the police name
+        PoliceRespondee policeRespondee = new PoliceRespondee("John Delinila", status);
+        mCitizenReport.child(report.getKey()).child("policeRespondee").child(policeUid).setValue(policeRespondee)
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        if (status.equals("on the way")) {
+                            Toast.makeText(RespondActivity.this, "Your respond is on the way", Toast.LENGTH_SHORT).show();
+                        }else {
+                            Toast.makeText(RespondActivity.this, "You have arrived in the destination of incident", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Toast.makeText(RespondActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void policeRespond(final String status) {
+        mCitizenReport.child(report.getKey()).child("policeRespondee").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                if (isOnTheWay != null && isOnTheWay) {
-
-                    // Check kung naka arrived na din sia
-
-                    String currentArrivedIds = dataSnapshot.getValue(String.class);
-                    if (!isAlreadyArrived(currentArrivedIds)) {
-                        mCitizenReport.child(report.getKey()).child("arrivedIds").runTransaction(new Transaction.Handler() {
-                            @Override
-                            public Transaction.Result doTransaction(MutableData mutableData) {
-                                String arrived_ids = "null";
-                                if (mutableData.getValue() != null) {
-                                    String current_ids = mutableData.getValue(String.class);
-                                    arrived_ids = combinePoliceIDs(current_ids, policeUid);
-                                }
-                                mutableData.setValue(arrived_ids);
-                                return Transaction.success(mutableData);
-                            }
-
-                            @Override
-                            public void onComplete(DatabaseError databaseError, boolean b, DataSnapshot dataSnapshot) {
-                                if (databaseError != null) {
-                                    Log.e("ERROR", databaseError.getMessage());
-                                    Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                                }else {
-                                    Toast.makeText(RespondActivity.this, "You have arrived on the incident", Toast.LENGTH_SHORT).show();
-                                }
-                            }
-                        });
+                if (dataSnapshot.hasChild(policeUid)) {
+                    boolean notResponded = true;
+                    for (DataSnapshot childSnapshot: dataSnapshot.getChildren()) {
+                        if (childSnapshot.getKey().equals(policeUid) && childSnapshot.child("police_respond").getValue(String.class).equals(status)) {
+                            notResponded = false;
+                            break;
+                        }
                     }
+                    if (notResponded) {
+                        sendRespond(status);
+                    }
+                }else {
+                    sendRespond(status);
                 }
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
-
+                Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
