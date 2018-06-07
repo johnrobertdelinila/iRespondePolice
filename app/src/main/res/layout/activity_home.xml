@@ -1,14 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<android.support.design.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".HomeActivity">
 
-    <android.support.v7.widget.RecyclerView
-        android:id="@+id/firebaseRecyclerview"
+    <android.support.v4.widget.NestedScrollView
+        android:orientation="vertical"
+        android:scrollbars="vertical"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent">
 
-</RelativeLayout>
+        <android.support.v7.widget.RecyclerView
+            android:fitsSystemWindows="true"
+            android:id="@+id/firebaseRecyclerview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </android.support.v4.widget.NestedScrollView>
+
+    <ProgressBar
+        android:id="@+id/progresBar"
+        style="?android:attr/progressBarStyleLarge"
+        android:layout_gravity="center"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <com.roughike.bottombar.BottomBar
+        android:id="@+id/bottomBar"
+        app:bb_badgesHideWhenActive="true"
+        app:bb_showShadow="false"
+        app:bb_tabXmlResource="@xml/bottom_tabs"
+        app:bb_behavior="underNavbar|shifting|shy"
+        android:layout_width="match_parent"
+        android:layout_gravity="bottom"
+        android:layout_height="60dp" />
+
+</android.support.design.widget.CoordinatorLayout>

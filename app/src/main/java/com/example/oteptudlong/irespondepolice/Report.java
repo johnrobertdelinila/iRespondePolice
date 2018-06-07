@@ -9,10 +9,12 @@ public class Report implements Serializable {
     private String uid, location_name, police_report_ids, status, incident, description, police_repondents, key;
     private Object timestamp;
     private Map<String, Double> location_latlng;
+    private long numOfRespondee;
+    private Map<String, String> images;
 
     public Report() {}
 
-    public Report(String uid, String location_name, String police_report_ids, String status, String incident, String description, String police_repondents, Map<String, String> timestamp, Map<String, Double> location_latlng) {
+    public Report(String uid, String location_name, String police_report_ids, String status, String incident, String description, String police_repondents, Map<String, String> timestamp, Map<String, Double> location_latlng, Map<String, String> images) {
         this.uid = uid;
         this.location_name = location_name;
         this.police_report_ids = police_report_ids;
@@ -22,6 +24,23 @@ public class Report implements Serializable {
         this.police_repondents = police_repondents;
         this.timestamp = timestamp;
         this.location_latlng = location_latlng;
+        this.images = images;
+    }
+
+    public Map<String, String> getImages() {
+        return images;
+    }
+
+    public void setImages(Map<String, String> images) {
+        this.images = images;
+    }
+
+    public long getNumOfRespondee() {
+        return numOfRespondee;
+    }
+
+    public void setNumOfRespondee(long numOfRespondee) {
+        this.numOfRespondee = numOfRespondee;
     }
 
     public String getKey() {

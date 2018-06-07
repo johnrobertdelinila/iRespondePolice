@@ -1,4 +1,8 @@
 <resources>
-    <string name="app_name">iRespondePolice</string>
+    <string name="app_name">iResponde Police</string>
     <string name="title_activity_maps">Map</string>
+    <string name="hint_password">Password</string>
+    <string name="hint_email">Email</string>
+    <string name="btn_txt_login">Login</string>
+    <string name="form_title">Police Sign In</string>
 </resources>

@@ -5,10 +5,14 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
+import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
+import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.BottomSheetBehavior;
+import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -16,7 +20,11 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.firebase.geofire.GeoFire;
@@ -34,13 +42,19 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -49,6 +63,9 @@ import com.google.firebase.database.MutableData;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.squareup.picasso.Picasso;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -60,6 +77,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -71,31 +89,49 @@ public class RespondActivity
         extends AppCompatActivity
         implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener, GeoQueryEventListener {
 
-    public GoogleMap mMap;
-    public Report report;
+    // Permission Request
     private static final int PERMISSION_REQUEST_CODE = 1996;
     private static final int GOOGLE_PLAY_SERVICES_REQUEST_CODE = 1997;
-    private static final String TAG = "RespondActivity";
 
+    // Data
+    public Report report;
+    private static final String TAG = "RespondActivity";
+    private boolean isBottomSheetCollapsed = true, isBottomSheetHidden = false;
+    private String policeName = FirebaseAuth.getInstance().getCurrentUser().getDisplayName();
+    private static final String LOADING_IMAGE_URL = "https://www.google.com/images/spin-32.gif";
+    private String citizenPhoneStr = null;
+
+    // Location
     private GoogleApiClient googleApiClient;
     private LocationRequest locationRequest;
     private Location mLastLocation;
     private LatLng destination;
 
-    private Marker markerOrigin, markerDest;
+    // Widgets
+    public GoogleMap mMap;
+    private Marker markerOrigin;
     private Polyline polyline;
-
     public LinearLayout bottomSheetLayout;
     public BottomSheetBehavior bottomSheetBehavior;
-
     public Button btn_send_report, btn_fake_report, btn_respond;
+    private SpotsDialog loadingDialog;
+    private RelativeLayout relativeLayout;
+    private FloatingActionButton fab;
+    private ImageView imageCar;
+    private Handler handler;
+    private TextView citizenName, citizenPhone, incidentName, incidentStatus, incidentDesc, distanceKm;
+    private LinearLayout actionContainer;
+    private LinearLayout imageContainer;
+    private HorizontalScrollView horizontalScroll;
+    private LinearLayout linearSMS;
+
+    // Firebase
     private DatabaseReference mCitizenReport = FirebaseDatabase.getInstance().getReference().child("Citizen Reports");
     private DatabaseReference mCitizen = FirebaseDatabase.getInstance().getReference().child("Citizens");
     private DatabaseReference mPoliceReport = FirebaseDatabase.getInstance().getReference().child("Police Reports");
     private DatabaseReference mPoliceLocation = FirebaseDatabase.getInstance().getReference().child("Police Locations");
     private GeoFire geoPoliceLocation;
-    private SpotsDialog loadingDialog;
-    private String policeUid = "police_id";
+    private String policeUid = FirebaseAuth.getInstance().getCurrentUser().getUid();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -110,6 +146,49 @@ public class RespondActivity
         setUpLocation();
 
         bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+        imageCar.animate().scaleX(0).scaleY(0).setDuration(0).start();
+        handler = new Handler();
+        bottomSheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+            @Override
+            public void onStateChanged(@NonNull View bottomSheet, int newState) {
+                if (newState == BottomSheetBehavior.STATE_EXPANDED) {
+                    if (isBottomSheetHidden) {
+                        fab.animate().scaleX(0).scaleY(0).setDuration(150).start();
+                    }
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            imageCar.animate().scaleX(1).scaleY(1).setDuration(300).start();
+                        }
+                    }, 150);
+                    isBottomSheetCollapsed = false;
+                    isBottomSheetHidden = false;
+                }else if (newState == BottomSheetBehavior.STATE_COLLAPSED) {
+                    isBottomSheetCollapsed = true;
+                    isBottomSheetHidden = false;
+                    imageCar.animate().scaleX(0).scaleY(0).setDuration(300).start();
+                }else if (newState == BottomSheetBehavior.STATE_HIDDEN) {
+                    isBottomSheetHidden = true;
+                    fab.animate().scaleX(1).scaleY(1).setDuration(300).start();
+                }
+            }
+
+            @Override
+            public void onSlide(@NonNull View bottomSheet, float slideOffset) {
+                if (!isBottomSheetHidden) {
+                    fab.animate().scaleX(1 - slideOffset).scaleY(1 - slideOffset).setDuration(0).start();
+                }
+                if (!isBottomSheetCollapsed) {
+                    imageCar.animate().scaleX(0 + slideOffset).scaleY(0 + slideOffset).setDuration(0).start();
+                }
+            }
+        });
+        fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleBottomSheet();
+            }
+        });
 
         btn_send_report.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -129,13 +208,129 @@ public class RespondActivity
                 policeRespond("on the way");
             }
         });
+        relativeLayout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleBottomSheet();
+            }
+        });
+        linearSMS.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sendSMStoCitizen();
+            }
+        });
+
+        getCitizenDetails();
 
         // Listeners
         policeRespondentListener();
         checkPoliceRespond();
         checkPoliceReportForButton();
 
-        // TODO: Fake report button and Write report button is hide, Respond button is show
+        if (report.getImages() != null) {
+            Log.e("IMAGES", "May mga nakitang image");
+            horizontalScroll.setVisibility(HorizontalScrollView.VISIBLE);
+            LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT);
+            layoutParams.setMargins(10, 10, 10, 0);
+            for (String key_image: report.getImages().keySet()) {
+                final String imageUrl = report.getImages().get(key_image);
+                Log.e("IMAGES", imageUrl);
+
+                final SquareImageView squareImageView = new SquareImageView(RespondActivity.this);
+                squareImageView.setLayoutParams(layoutParams);
+
+//                squareImageView.setImageDrawable(getResources().getDrawable(R.drawable.no_image));
+                if (imageUrl.startsWith("gs://")) {
+                    StorageReference storageReference = FirebaseStorage.getInstance().getReferenceFromUrl(imageUrl);
+                    storageReference.getDownloadUrl().addOnCompleteListener(new OnCompleteListener<Uri>() {
+                        @Override
+                        public void onComplete(@NonNull Task<Uri> task) {
+                            if (task.isSuccessful()) {
+                                String downloadUrl = task.getResult().toString();
+                                Picasso.get().load(downloadUrl).placeholder(R.drawable.loading_image).into(squareImageView);
+                            }else {
+                                Toast.makeText(RespondActivity.this, task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+                }else {
+                    Picasso.get().load(imageUrl).placeholder(R.drawable.loading_image).into(squareImageView);
+                }
+
+                imageContainer.addView(squareImageView);
+            }
+        }else {
+            Log.e("IMAGES", "No images found");
+        }
+
+    }
+
+    private void sendSMStoCitizen() {
+        String message = "Police text message.";
+        if (citizenPhoneStr != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                // At least KitKat
+                Intent smsMsgAppVar = new Intent(Intent.ACTION_VIEW);
+                smsMsgAppVar.setData(Uri.parse("sms:" + citizenPhoneStr));
+                smsMsgAppVar.putExtra("sms_body", message);
+                startActivity(smsMsgAppVar);
+
+            } else {
+                // For early versions, do what worked for you before.
+                Intent smsIntent = new Intent(android.content.Intent.ACTION_VIEW);
+                smsIntent.setType("vnd.android-dir/mms-sms");
+                smsIntent.putExtra("address", citizenPhoneStr);
+                smsIntent.putExtra("sms_body", message);
+                startActivity(smsIntent);
+            }
+        }
+    }
+
+    private void getCitizenDetails() {
+        mCitizen.child(report.getUid()).addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                Citizen citizen = dataSnapshot.getValue(Citizen.class);
+                if (citizen != null) {
+                    citizenName.setText(citizen.getDisplayName());
+                    citizenPhoneStr = citizen.getPhoneNumber();
+                    citizenPhone.setText(citizenPhoneStr);
+                    incidentName.setText(report.getIncident());
+                    String status;
+                    int color;
+                    if (report.getStatus().equals("faked")) {
+                        status = "Faked";
+                        color = getResources().getColor(R.color.cardStatusPending);
+                    }else if (report.getStatus().equals("resolved")) {
+                        status = "Resolved";
+                        color = getResources().getColor(R.color.cardStatusResolved);
+                    }else {
+                        status = "Unresolve";
+                        color = getResources().getColor(R.color.cardStatusPending);
+                    }
+                    incidentStatus.setText(status);
+                    incidentStatus.setTextColor(color);
+                    if (report.getDescription() != null) {
+                        incidentDesc.setText(report.getDescription());
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void toggleBottomSheet() {
+
+        if (isBottomSheetCollapsed) {
+            bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+        }else {
+            bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+        }
 
     }
 
@@ -148,6 +343,7 @@ public class RespondActivity
     }
 
     private void init() {
+        getSupportActionBar().hide();
         report = (Report) getIntent().getSerializableExtra("report");
         bottomSheetLayout = findViewById(R.id.bottomSheet);
         bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetLayout);
@@ -157,12 +353,25 @@ public class RespondActivity
         btn_respond = findViewById(R.id.btn_respond);
         geoPoliceLocation = new GeoFire(mPoliceLocation.child(policeUid));
         destination = new LatLng(report.getLocation_latlng().get("latitude"), report.getLocation_latlng().get("longtitude"));
+        relativeLayout = findViewById(R.id.relativeLayout);
+        fab = findViewById(R.id.fab);
+        imageCar = findViewById(R.id.imageCar);
+        citizenName = findViewById(R.id.text_citizen_name);
+        citizenPhone = findViewById(R.id.text_citizen_phone);
+        incidentName = findViewById(R.id.text_incident_name);
+        incidentStatus = findViewById(R.id.text_incident_status);
+        incidentDesc = findViewById(R.id.text_incident_desc);
+        distanceKm = findViewById(R.id.text_km);
+        actionContainer = findViewById(R.id.action_container);
+        imageContainer = findViewById(R.id.imageContainer);
+        horizontalScroll = findViewById(R.id.horizontalScroll);
+        linearSMS = findViewById(R.id.linearSMS);
     }
 
     private void checkPoliceReportForSending() {
         mCitizenReport.child(report.getKey()).child("policeReports").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
 
                 if (dataSnapshot.hasChild(policeUid)) {
                     for (DataSnapshot childSnapshot: dataSnapshot.getChildren()) {
@@ -184,7 +393,7 @@ public class RespondActivity
             }
 
             @Override
-            public void onCancelled(DatabaseError databaseError) {
+            public void onCancelled(@NonNull DatabaseError databaseError) {
                 Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
@@ -193,7 +402,7 @@ public class RespondActivity
     private void checkPoliceReportForFake() {
         mCitizenReport.child(report.getKey()).child("policeReports").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 if (dataSnapshot.hasChild(policeUid)) {
                     // Already sended a report
                     // Ask first to remove the current police report
@@ -205,7 +414,7 @@ public class RespondActivity
             }
 
             @Override
-            public void onCancelled(DatabaseError databaseError) {
+            public void onCancelled(@NonNull DatabaseError databaseError) {
 
             }
         });
@@ -325,14 +534,18 @@ public class RespondActivity
                 if (dataSnapshot.hasChild(policeUid)) {
                     for (DataSnapshot childSnapshot: dataSnapshot.getChildren()) {
                         // Check if your already on the way
-                        // TODO: Must get your own UID
                         if (childSnapshot.getKey().equals(policeUid)) {
                             // Police is on the way
                             String policeRespond = childSnapshot.child("police_respond").getValue(String.class);
                             btn_respond.setText("RESPONDING...");
+                            btn_respond.animate().scaleX(0).scaleY(0).setDuration(150).start();
+                            actionContainer.animate().scaleX(1).scaleY(1).setDuration(150).start();
+                            actionContainer.bringToFront();
                             Log.e("YOUR RESPOND", policeRespond);
-                            if (policeRespond.equals("arrived")) {
+                            if (policeRespond != null && policeRespond.equals("arrived")) {
                                 // TODO: Hide the Respond Button and Show the Write and Fake Button
+                                btn_send_report.setEnabled(true);
+                                btn_fake_report.setEnabled(true);
                             }
                             break;
                         }
@@ -340,6 +553,11 @@ public class RespondActivity
                 }else {
                     btn_respond.setText("RESPOND");
                     // TODO: Hide the Show and Write Button and Show the Respond Button
+                    actionContainer.animate().scaleX(0).scaleY(0).setDuration(150).start();
+                    btn_send_report.setEnabled(false);
+                    btn_fake_report.setEnabled(false);
+                    btn_respond.animate().scaleX(1).scaleY(1).setDuration(150).start();
+                    btn_respond.bringToFront();
                 }
             }
 
@@ -402,36 +620,57 @@ public class RespondActivity
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
+        // Add Marker
         MarkerOptions markerOptionsDest = new MarkerOptions();
         markerOptionsDest.position(destination);
         markerOptionsDest.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
         markerOptionsDest.title(report.getIncident());
-        markerDest = mMap.addMarker(markerOptionsDest);
+        mMap.addMarker(markerOptionsDest);
 
-        mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
-            @Override
-            public void onMapClick(LatLng latLng) {
-                bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-            }
-        });
+        // Add Radius
+        double radiusInMeter = 300; // 0.6 km
+        int strokeColor = 0xffff0000;
+        int shadeColor = 0x44ff0000;
+        CircleOptions circleOptions = new CircleOptions();
+        circleOptions.center(destination);
+        circleOptions.radius(radiusInMeter);
+        circleOptions.fillColor(shadeColor);
+        circleOptions.strokeColor(strokeColor);
+        circleOptions.strokeWidth(4);
+        mMap.addCircle(circleOptions);
 
     }
 
     @Override
     public void onConnected(@Nullable Bundle bundle) {
-        setLocation();
+        showLocation();
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
         LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, this);
     }
 
-    private void setLocation() {
+    private void showLocation() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
         if (mLastLocation != null) {
+
+            Location reportLocation = new Location("");
+            reportLocation.setLatitude(report.getLocation_latlng().get("latitude"));
+            reportLocation.setLongitude(report.getLocation_latlng().get("longtitude"));
+
+            float distance = (float) (mLastLocation.distanceTo(reportLocation) * 0.001);
+            DecimalFormat f = new DecimalFormat("##.00");
+
+            String distanceInKilometer;
+            if (distance == 0) {
+                distanceInKilometer = "0km";
+            }else {
+                distanceInKilometer = f.format(distance) + "km";
+            }
+            distanceKm.setText(distanceInKilometer);
 
             final LatLng origin = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
 
@@ -443,7 +682,7 @@ public class RespondActivity
 
                         MarkerOptions markerOptions = new MarkerOptions();
                         markerOptions.position(origin);
-                        markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
+                        markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
                         markerOptions.title("Your location");
 
                         if (markerOrigin != null) {
@@ -455,7 +694,12 @@ public class RespondActivity
                         FetchUrl FetchUrl = new FetchUrl();
                         FetchUrl.execute(url);
 
-                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(origin, 17.0f));
+                        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+                        builder.include(origin);
+                        builder.include(destination);
+                        LatLngBounds bounds = builder.build();
+
+                        mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 240));
 
                     }else {
                         Toast.makeText(RespondActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
@@ -480,7 +724,7 @@ public class RespondActivity
     @Override
     public void onLocationChanged(Location location) {
         mLastLocation = location;
-        setLocation();
+        showLocation();
     }
 
     @Override
@@ -490,7 +734,7 @@ public class RespondActivity
                 if (isGooglePlayServices()) {
                     buildGoogleApiClient();
                     setUpLocationRequest();
-                    setLocation();
+                    showLocation();
                 }
             }else {
                 Toast.makeText(this, "Please allow the permission request in settings.", Toast.LENGTH_SHORT).show();
@@ -544,7 +788,7 @@ public class RespondActivity
 
     @Override
     public void onGeoQueryReady() {
-        Toast.makeText(this, "GeoQueryReady!", Toast.LENGTH_SHORT).show();
+//        Toast.makeText(this, "GeoQueryReady!", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -573,8 +817,7 @@ public class RespondActivity
     }
 
     private void sendRespond(final String status) {
-        // TODO: Get the police name
-        PoliceRespondee policeRespondee = new PoliceRespondee("John Delinila", status);
+        PoliceRespondee policeRespondee = new PoliceRespondee(policeName, status);
         mCitizenReport.child(report.getKey()).child("policeRespondee").child(policeUid).setValue(policeRespondee)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     @Override

@@ -12,6 +12,7 @@ import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -39,8 +40,8 @@ public class PoliceReportActivity extends AppCompatActivity {
     public String citizen_report_id;
     public Double latitude, longtitude;
     private SpotsDialog loadingDialog;
-    private static final String randomStringSeparator = "eISN3K053y";
-    private String policeUid = "police_id";
+    private String policeUid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+    private String str_incident = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,13 +50,15 @@ public class PoliceReportActivity extends AppCompatActivity {
 
         init();
 
+        // TODO: Make title spinner
+
         Log.e("KEY", citizen_report_id);
 
         btn_submit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 String str_case_no = case_no.getText().toString().trim();
-                String str_incident = incident.getText().toString().trim();
+                str_incident = incident.getText().toString().trim();
                 String str_detail = detail_of_event.getText().toString().trim();
                 String str_action = actions_taken.getText().toString().trim();
                 String str_witness = witness.getText().toString().trim();
@@ -87,8 +90,6 @@ public class PoliceReportActivity extends AppCompatActivity {
     private void insertReport(String str_action, String str_case_no, String str_witness, String str_detail, String str_incident) {
         String time = DateFormat.getTimeInstance().format(new Date());
         String date = DateFormat.getDateInstance().format(new Date());
-
-        // TODO: Get the proper Police UID
 
         PoliceReport policeReport = new PoliceReport();
         policeReport.setActions_taken(str_action);
@@ -138,6 +139,7 @@ public class PoliceReportActivity extends AppCompatActivity {
     private void updateReportStatus() {
         HashMap<String, Object> status = new HashMap<>();
         status.put("status", "resolved");
+        status.put("title", str_incident);
         mCitizenReport.child(citizen_report_id).updateChildren(status)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     @Override
@@ -157,6 +159,8 @@ public class PoliceReportActivity extends AppCompatActivity {
     }
 
     private void init() {
+        PoliceReportActivity.this.setTitle("Police Report");
+
         case_no = findViewById(R.id.edit_case_no);
         incident = findViewById(R.id.edit_incident);
         detail_of_event = findViewById(R.id.edit_detail);
