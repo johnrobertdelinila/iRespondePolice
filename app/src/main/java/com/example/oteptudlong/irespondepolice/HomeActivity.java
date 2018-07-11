@@ -5,9 +5,11 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
+import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.view.animation.LinearOutSlowInInterpolator;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
@@ -68,6 +70,7 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
     private Location mLastLocation;
     private BottomBarTab reportPending;
     private int pendingCount = 0;
+    private int animatedRow = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -116,7 +119,6 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
 
         reportPending = bottomBar.getTabWithId(R.id.tab_reports);
 
-        // TODO: Show Resolved Reports in UI
         // TODO: Add logout
         // Initialize RecyclerView
         firebaseRecycler = findViewById(R.id.firebaseRecyclerview);
@@ -238,7 +240,31 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
 
             @Override
             protected void onBindViewHolder(@NonNull ReportHolder holder, int position, @NonNull Report model) {
-                progressBar.setVisibility(ProgressBar.INVISIBLE);
+
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        progressBar.setVisibility(ProgressBar.INVISIBLE);
+                    }
+                }, 190);
+
+                if (position > animatedRow) {
+                    animatedRow = position;
+                    long animationDelay = 1000L + holder.getAdapterPosition() * 25;
+
+                    holder.itemView.setAlpha(0);
+                    holder.itemView.setTranslationY(ScreenUtil.dp2px(16, holder.itemView.getContext()));
+
+                    holder.itemView.animate()
+                            .alpha(1)
+                            .translationY(0)
+                            .setDuration(200)
+                            .setInterpolator(new LinearOutSlowInInterpolator())
+                            .setStartDelay(animationDelay)
+                            .start();
+                }
+
+
 
                 if (model.getStatus().equals("pending")) {
                     pendingCount++;

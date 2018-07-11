@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<tabs xmlns:android="http://schemas.android.com/apk/res/android">
+    <tab
+        id="@+id/tab_reports"
+        icon="@drawable/ic_class_black_24dp"
+        title="Reports"
+        barColorWhenSelected="@color/colorAccent"
+        />
+    <tab
+        id="@+id/tab_profile"
+        icon="@drawable/ic_person_black_24dp"
+        title="My Profile"
+        barColorWhenSelected="#03a9f4"
+        />
+</tabs>
