@@ -1,15 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#37474f</color>
-    <color name="colorPrimaryDark">#263238 </color>
-    <color name="colorAccent">#3f51b5</color>
-    <!--<color name="colorAccent">#344955</color>-->
-    <color name="colorTextPrimary">#4B00D1</color>
-    <color name="colorButtonPrimary">#4B00D1</color>
-    <color name="textColor">#4F4F6F</color>
+    <color name="colorPrimary">#E8E8E8</color>
+    <color name="colorPrimaryDark">@color/colorPrimary</color>
+    <color name="colorAccent">#6B38FB</color>
+    <color name="colorTextPrimary">#1E1E1E</color>
+    <color name="colorBackground">#FFFFFF</color>
+    <color name="colorSpotsBackground">#EDF0F2</color>
+    <color name="colorTabBackground">#E5E5E5</color>
+    <color name="colorDefaultTab">#6432e8</color>
+    <color name="colorProfileTab">#fb6b38</color>
+    <color name="colorTextFade">#888888</color>
 
     <color name="cardStatusPending">#F4B400</color>
     <color name="cardStatusResolved">#4285F4</color>
+
+    <color name="colorControlActivated">@color/colorAccent</color>
+    <color name="textColorPrimary">#1E1E1E</color>
+    <color name="colorTextError">#E30425</color>
     <!--#b3d4fc-->
     <!--#37474f-->
 </resources>
+

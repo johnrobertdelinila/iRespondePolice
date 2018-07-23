@@ -47,12 +47,7 @@ public class LoginActivity extends AppCompatActivity {
 
         init();
 
-        btn_login.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                authenticatePolice();
-            }
-        });
+        btn_login.setOnClickListener(v -> authenticatePolice());
 
     }
 
@@ -71,46 +66,37 @@ public class LoginActivity extends AppCompatActivity {
         textInput_password.setError(null);
         loadingDialog.show();
         mAuth.signInWithEmailAndPassword(email, password)
-                .addOnSuccessListener(new OnSuccessListener<AuthResult>() {
+                .addOnSuccessListener(authResult -> mPolice.addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
-                    public void onSuccess(AuthResult authResult) {
-                        mPolice.addListenerForSingleValueEvent(new ValueEventListener() {
-                            @Override
-                            public void onDataChange(DataSnapshot dataSnapshot) {
-                                String uid = mAuth.getCurrentUser().getUid();
-                                if (dataSnapshot.hasChild(uid)) {
-                                    // Go to dashboard page
-                                    loadingDialog.dismiss();
-                                    Intent intent = new Intent(LoginActivity.this, HomeActivity.class);
-                                    finish();
-                                    startActivity(intent);
-                                }else {
-                                    // Logout user
-                                    loadingDialog.dismiss();
-                                    Toast.makeText(LoginActivity.this, "The password is invalid or the user does not have a password.", Toast.LENGTH_SHORT).show();
-                                    mAuth.signOut();
-                                }
-                            }
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                        String uid = authResult.getUser().getUid();
+                        if (dataSnapshot.hasChild(uid)) {
+                            // Go to dashboard page
+                            loadingDialog.dismiss();
+                            Intent intent = new Intent(LoginActivity.this, HomeActivity.class);
+                            finish();
+                            startActivity(intent);
+                        }else {
+                            // Logout user
+                            loadingDialog.dismiss();
+                            Toast.makeText(LoginActivity.this, "The password is invalid or the user does not have a password.", Toast.LENGTH_SHORT).show();
+                            mAuth.signOut();
+                        }
+                    }
 
-                            @Override
-                            public void onCancelled(DatabaseError databaseError) {
-                                loadingDialog.dismiss();
-                                Toast.makeText(LoginActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                            }
-                        });
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
                     @Override
-                    public void onFailure(@NonNull Exception e) {
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
                         loadingDialog.dismiss();
-                        Toast.makeText(LoginActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(LoginActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
                     }
+                }))
+                .addOnFailureListener(e -> {
+                    loadingDialog.dismiss();
+                    Toast.makeText(LoginActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 
     private void init() {
-        getSupportActionBar().hide();
 
         btn_login = findViewById(R.id.btn_login);
         edit_username = findViewById(R.id.edit_email);

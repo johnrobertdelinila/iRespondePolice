@@ -85,13 +85,14 @@ import java.util.List;
 
 import dmax.dialog.SpotsDialog;
 
-public class RespondActivity
-        extends AppCompatActivity
-        implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener, GeoQueryEventListener {
+public class RespondActivity extends AppCompatActivity implements OnMapReadyCallback,
+        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener,
+        LocationListener, GeoQueryEventListener {
 
     // Permission Request
     private static final int PERMISSION_REQUEST_CODE = 1996;
     private static final int GOOGLE_PLAY_SERVICES_REQUEST_CODE = 1997;
+    private static final int CALL_REQUEST_CODE = 1998;
 
     // Data
     public Report report;
@@ -124,6 +125,7 @@ public class RespondActivity
     private LinearLayout imageContainer;
     private HorizontalScrollView horizontalScroll;
     private LinearLayout linearSMS;
+    private LinearLayout callCitizen;
 
     // Firebase
     private DatabaseReference mCitizenReport = FirebaseDatabase.getInstance().getReference().child("Citizen Reports");
@@ -155,12 +157,7 @@ public class RespondActivity
                     if (isBottomSheetHidden) {
                         fab.animate().scaleX(0).scaleY(0).setDuration(150).start();
                     }
-                    handler.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            imageCar.animate().scaleX(1).scaleY(1).setDuration(300).start();
-                        }
-                    }, 150);
+                    handler.postDelayed(() -> imageCar.animate().scaleX(1).scaleY(1).setDuration(300).start(), 150);
                     isBottomSheetCollapsed = false;
                     isBottomSheetHidden = false;
                 }else if (newState == BottomSheetBehavior.STATE_COLLAPSED) {
@@ -183,41 +180,24 @@ public class RespondActivity
                 }
             }
         });
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                toggleBottomSheet();
-            }
-        });
+        fab.setOnClickListener(v -> toggleBottomSheet());
 
-        btn_send_report.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                checkPoliceReportForSending();
-            }
-        });
-        btn_fake_report.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                checkPoliceReportForFake();
-            }
-        });
-        btn_respond.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                policeRespond("on the way");
-            }
-        });
-        relativeLayout.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                toggleBottomSheet();
-            }
-        });
-        linearSMS.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                sendSMStoCitizen();
+        btn_send_report.setOnClickListener(v -> checkPoliceReportForSending());
+        btn_fake_report.setOnClickListener(v -> checkPoliceReportForFake());
+        btn_respond.setOnClickListener(v -> policeRespond("on the way"));
+        relativeLayout.setOnClickListener(v -> toggleBottomSheet());
+        linearSMS.setOnClickListener(v -> sendSMStoCitizen());
+        callCitizen.setOnClickListener(view -> {
+            if (citizenPhoneStr != null) {
+                // make a phone call
+                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(this, new String[]{
+                            Manifest.permission.CALL_PHONE
+                    }, CALL_REQUEST_CODE);
+                }
+                makePhoneCall();
+            }else {
+                Toast.makeText(this, "Citizen doesn't have Phone Number.", Toast.LENGTH_LONG).show();
             }
         });
 
@@ -243,15 +223,12 @@ public class RespondActivity
 //                squareImageView.setImageDrawable(getResources().getDrawable(R.drawable.no_image));
                 if (imageUrl.startsWith("gs://")) {
                     StorageReference storageReference = FirebaseStorage.getInstance().getReferenceFromUrl(imageUrl);
-                    storageReference.getDownloadUrl().addOnCompleteListener(new OnCompleteListener<Uri>() {
-                        @Override
-                        public void onComplete(@NonNull Task<Uri> task) {
-                            if (task.isSuccessful()) {
-                                String downloadUrl = task.getResult().toString();
-                                Picasso.get().load(downloadUrl).placeholder(R.drawable.loading_image).into(squareImageView);
-                            }else {
-                                Toast.makeText(RespondActivity.this, task.getException().getMessage(), Toast.LENGTH_SHORT).show();
-                            }
+                    storageReference.getDownloadUrl().addOnCompleteListener(task -> {
+                        if (task.isSuccessful()) {
+                            String downloadUrl = task.getResult().toString();
+                            Picasso.get().load(downloadUrl).placeholder(R.drawable.loading_image).into(squareImageView);
+                        }else {
+                            Toast.makeText(RespondActivity.this, task.getException().getMessage(), Toast.LENGTH_SHORT).show();
                         }
                     });
                 }else {
@@ -264,6 +241,26 @@ public class RespondActivity
             Log.e("IMAGES", "No images found");
         }
 
+    }
+
+    private void makePhoneCall() {
+        if (citizenPhoneStr != null) {
+            Intent intent = new Intent(Intent.ACTION_CALL, Uri.parse("tel:" + citizenPhoneStr));
+            if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                Toast.makeText(this, "Please allow the permission in settings to make a phone call.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            Toast.makeText(this, "Making a phone call to Citizen.", Toast.LENGTH_SHORT).show();
+            startActivity(intent);
+        }else {
+            Toast.makeText(this, "Citizen doesn't have Phone Number.", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void sendSMStoCitizen() {
@@ -343,7 +340,6 @@ public class RespondActivity
     }
 
     private void init() {
-        getSupportActionBar().hide();
         report = (Report) getIntent().getSerializableExtra("report");
         bottomSheetLayout = findViewById(R.id.bottomSheet);
         bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetLayout);
@@ -366,6 +362,7 @@ public class RespondActivity
         imageContainer = findViewById(R.id.imageContainer);
         horizontalScroll = findViewById(R.id.horizontalScroll);
         linearSMS = findViewById(R.id.linearSMS);
+        callCitizen = findViewById(R.id.layout_call_citizen);
     }
 
     private void checkPoliceReportForSending() {
@@ -434,11 +431,9 @@ public class RespondActivity
         HashMap<String, Object> status = new HashMap<>();
         status.put("status", "faked");
         mCitizenReport.child(report.getKey()).updateChildren(status)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        Toast.makeText(RespondActivity.this, "Considered as fake report.", Toast.LENGTH_SHORT).show();
-                        // Add fake report to citizen
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(RespondActivity.this, "Considered as fake report.", Toast.LENGTH_SHORT).show();
+                    // Add fake report to citizen
 //                        mCitizen.child(report.getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
 //                            @Override
 //                            public void onDataChange(DataSnapshot dataSnapshot) {
@@ -452,7 +447,6 @@ public class RespondActivity
 //
 //                            }
 //                        });
-                    }
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     @Override
@@ -464,24 +458,19 @@ public class RespondActivity
 
     private void removePoliceReport(String policeReportID) {
         mPoliceReport.child(policeReportID).removeValue()
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        mCitizenReport.child(report.getKey()).child("policeReports").child(policeUid).removeValue()
-                                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                                    @Override
-                                    public void onSuccess(Void aVoid) {
-                                        updateReportStatus();
-                                    }
-                                })
-                                .addOnFailureListener(new OnFailureListener() {
-                                    @Override
-                                    public void onFailure(@NonNull Exception e) {
+                .addOnSuccessListener(aVoid -> mCitizenReport.child(report.getKey()).child("policeReports").child(policeUid).removeValue()
+                        .addOnSuccessListener(new OnSuccessListener<Void>() {
+                            @Override
+                            public void onSuccess(Void aVoid) {
+                                updateReportStatus();
+                            }
+                        })
+                        .addOnFailureListener(new OnFailureListener() {
+                            @Override
+                            public void onFailure(@NonNull Exception e) {
 
-                                    }
-                                });
-                    }
-                })
+                            }
+                        }))
                 .addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(@NonNull Exception e) {
@@ -739,6 +728,12 @@ public class RespondActivity
             }else {
                 Toast.makeText(this, "Please allow the permission request in settings.", Toast.LENGTH_SHORT).show();
             }
+        }else if (requestCode == CALL_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                makePhoneCall();
+            }else {
+                Toast.makeText(this, "You can allow the permission request in the settings.", Toast.LENGTH_LONG).show();
+            }
         }
     }
 
@@ -819,22 +814,14 @@ public class RespondActivity
     private void sendRespond(final String status) {
         PoliceRespondee policeRespondee = new PoliceRespondee(policeName, status);
         mCitizenReport.child(report.getKey()).child("policeRespondee").child(policeUid).setValue(policeRespondee)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        if (status.equals("on the way")) {
-                            Toast.makeText(RespondActivity.this, "Your respond is on the way", Toast.LENGTH_SHORT).show();
-                        }else {
-                            Toast.makeText(RespondActivity.this, "You have arrived in the destination of incident", Toast.LENGTH_SHORT).show();
-                        }
+                .addOnSuccessListener(aVoid -> {
+                    if (status.equals("on the way")) {
+                        Toast.makeText(RespondActivity.this, "Your respond is on the way", Toast.LENGTH_SHORT).show();
+                    }else {
+                        Toast.makeText(RespondActivity.this, "You have arrived in the destination of incident", Toast.LENGTH_SHORT).show();
                     }
                 })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Toast.makeText(RespondActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
-                });
+                .addOnFailureListener(e -> Toast.makeText(RespondActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
     private void policeRespond(final String status) {

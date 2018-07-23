@@ -33,7 +33,7 @@
         android:id="@+id/fab"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="20dp"
+        android:layout_margin="28dp"
         android:tint="#6200EE"
         app:backgroundTint="@android:color/white"
         app:srcCompat="@drawable/ic_class_black_24dp"

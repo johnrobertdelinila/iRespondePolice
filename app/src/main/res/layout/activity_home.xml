@@ -4,21 +4,46 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/colorSpotsBackground"
     tools:context=".HomeActivity">
 
-    <android.support.v4.widget.NestedScrollView
+    <LinearLayout
+        android:fitsSystemWindows="true"
         android:orientation="vertical"
-        android:scrollbars="vertical"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <android.support.v7.widget.RecyclerView
-            android:fitsSystemWindows="true"
-            android:id="@+id/firebaseRecyclerview"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+        <TextView
+            android:id="@+id/textview_title_page"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="24dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginLeft="24dp"
+            android:text="Reports"
+            android:textAppearance="@style/TextAppearanceTitle"
+            android:fontFamily="@font/work_sans_semibold"
+            android:textColor="@color/colorAccent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:targetApi="lollipop" />
 
-    </android.support.v4.widget.NestedScrollView>
+        <android.support.v4.widget.NestedScrollView
+            android:id="@+id/nestedScrollView"
+            android:requiresFadingEdge="vertical"
+            android:orientation="vertical"
+            android:scrollbars="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <android.support.v7.widget.RecyclerView
+                android:id="@+id/firebaseRecyclerview"
+                android:requiresFadingEdge="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+        </android.support.v4.widget.NestedScrollView>
+
+    </LinearLayout>
 
     <ProgressBar
         android:id="@+id/progresBar"
@@ -29,8 +54,9 @@
 
     <com.roughike.bottombar.BottomBar
         android:id="@+id/bottomBar"
+        app:bb_titleTextAppearance="@style/TextAppearanceTabs"
         app:bb_badgesHideWhenActive="true"
-        app:bb_showShadow="false"
+        app:bb_showShadow="true"
         app:bb_tabXmlResource="@xml/bottom_tabs"
         app:bb_behavior="underNavbar|shifting|shy"
         android:layout_width="match_parent"

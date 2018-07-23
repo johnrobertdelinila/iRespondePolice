@@ -10,6 +10,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.view.animation.LinearOutSlowInInterpolator;
+import android.support.v4.widget.NestedScrollView;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
@@ -19,8 +20,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.firebase.ui.common.ChangeEventType;
 import com.firebase.ui.database.FirebaseRecyclerAdapter;
 import com.firebase.ui.database.FirebaseRecyclerOptions;
 import com.firebase.ui.database.SnapshotParser;
@@ -71,6 +74,8 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
     private BottomBarTab reportPending;
     private int pendingCount = 0;
     private int animatedRow = -1;
+    private TextView textTitle;
+    private NestedScrollView nestedScrollView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,20 +88,20 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
             return;
         }else {
             mAuth.getCurrentUser().getIdToken(true)
-                    .addOnFailureListener(new OnFailureListener() {
-                        @Override
-                        public void onFailure(@NonNull Exception e) {
-                            String disabledMessage = "The user account has been disabled by an administrator.";
-                            String errMessage =  e.getMessage();
-                            if (disabledMessage.equals(errMessage)) {
-                                // OR ADD DELETED IF THE ACCOUNT HAS BEEN DELETED
-                                // If the user is disabled
-                                goLoginPage();
-                                Toast.makeText(HomeActivity.this, errMessage, Toast.LENGTH_LONG).show();
-                            }
+                    .addOnFailureListener(e -> {
+                        String disabledMessage = "The user account has been disabled by an administrator.";
+                        String errMessage =  e.getMessage();
+                        if (disabledMessage.equals(errMessage)) {
+                            // OR ADD DELETED IF THE ACCOUNT HAS BEEN DELETED
+                            // If the user is disabled
+                            goLoginPage();
+                            Toast.makeText(HomeActivity.this, errMessage, Toast.LENGTH_LONG).show();
                         }
                     });
         }
+
+        textTitle = findViewById(R.id.textview_title_page);
+        nestedScrollView = findViewById(R.id.nestedScrollView);
 
         setUpLocation();
 
@@ -106,15 +111,17 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
         mThisPolice = FirebaseDatabase.getInstance().getReference().child("Police").child(uid);
 
         bottomBar = findViewById(R.id.bottomBar);
-        bottomBar.setOnTabSelectListener(new OnTabSelectListener() {
-            @Override
-            public void onTabSelected(int tabId) {
-                if (tabId == R.id.tab_reports) {
-                    bottomBar.refreshDrawableState();
-                }else if (tabId == R.id.tab_profile) {
-                    bottomBar.refreshDrawableState();
-                }
+        bottomBar.setOnTabSelectListener(tabId -> {
+            if (tabId == R.id.tab_reports) {
+                textTitle.setText("Report(s)");
+                textTitle.setTextColor(getResources().getColor(R.color.colorAccent));
+                nestedScrollView.setVisibility(NestedScrollView.VISIBLE);
+            }else if (tabId == R.id.tab_profile) {
+                textTitle.setText("Profile Overview");
+                textTitle.setTextColor(getResources().getColor(R.color.colorProfileTab));
+                nestedScrollView.setVisibility(NestedScrollView.GONE);
             }
+            bottomBar.refreshDrawableState();
         });
 
         reportPending = bottomBar.getTabWithId(R.id.tab_reports);
@@ -130,32 +137,29 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
 
     private void setFirebaseRecyclerView() {
         // Insert the FIREBASE TIMESTAMP
-        mThisPolice.child("readTime").setValue(ServerValue.TIMESTAMP, new DatabaseReference.CompletionListener() {
-            @Override
-            public void onComplete(DatabaseError databaseError, @NonNull DatabaseReference databaseReference) {
-                // Retrieve the Firebase TIMESTAMP
-                if (databaseError == null) {
-                    databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                            // only report from the last 24 hours can be read.
-                            // regardless of the report status; ex. pending or resolved
-                            Long currentTime = dataSnapshot.getValue(Long.class);
-                            int day = 86400000; // 1 day to milliseconds
-                            if (currentTime != null) {
-                                Query query = mCitizenReport.orderByChild("timestamp").startAt((currentTime - day));
-                                setmFirebaseAdapter(query);
-                            }
+        mThisPolice.child("readTime").setValue(ServerValue.TIMESTAMP, (databaseError, databaseReference) -> {
+            // Retrieve the Firebase TIMESTAMP
+            if (databaseError == null) {
+                databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                        // only report from the last 24 hours can be read.
+                        // regardless of the report status; ex. pending or resolved
+                        Long currentTime = dataSnapshot.getValue(Long.class);
+                        int day = 86400000; // 1 day to milliseconds
+                        if (currentTime != null) {
+                            Query query = mCitizenReport.orderByChild("timestamp").startAt((currentTime - day));
+                            setmFirebaseAdapter(query);
                         }
+                    }
 
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError databaseError) {
-                            Toast.makeText(HomeActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                } else {
-                    Toast.makeText(HomeActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                }
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        Toast.makeText(HomeActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } else {
+                Toast.makeText(HomeActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -209,21 +213,17 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
     }
 
     private void setmFirebaseAdapter(Query query) {
-        SnapshotParser<Report> parser = new SnapshotParser<Report>() {
-            @NonNull
-            @Override
-            public Report parseSnapshot(DataSnapshot snapshot) {
-                Report report = snapshot.getValue(Report.class);
-                if (report != null) {
-                    report.setKey(snapshot.getKey());
-                    if (snapshot.hasChild("policeRespondee")) {
-                        report.setNumOfRespondee(snapshot.child("policeRespondee").getChildrenCount());
-                    }else {
-                        report.setNumOfRespondee(0);
-                    }
+        SnapshotParser<Report> parser = snapshot -> {
+            Report report = snapshot.getValue(Report.class);
+            if (report != null) {
+                report.setKey(snapshot.getKey());
+                if (snapshot.hasChild("policeRespondee")) {
+                    report.setNumOfRespondee(snapshot.child("policeRespondee").getChildrenCount());
+                }else {
+                    report.setNumOfRespondee(0);
                 }
-                return report;
             }
+            return report;
         };
 
         FirebaseRecyclerOptions<Report> options = new FirebaseRecyclerOptions.Builder<Report>()
@@ -241,19 +241,14 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
             @Override
             protected void onBindViewHolder(@NonNull ReportHolder holder, int position, @NonNull Report model) {
 
-                new Handler().postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        progressBar.setVisibility(ProgressBar.INVISIBLE);
-                    }
-                }, 190);
+                new Handler().postDelayed(() -> progressBar.setVisibility(ProgressBar.INVISIBLE), 190);
 
                 if (position > animatedRow) {
                     animatedRow = position;
-                    long animationDelay = 1000L + holder.getAdapterPosition() * 25;
+                    long animationDelay = 400L + holder.getAdapterPosition() * 25;
 
                     holder.itemView.setAlpha(0);
-                    holder.itemView.setTranslationY(ScreenUtil.dp2px(16, holder.itemView.getContext()));
+//                    holder.itemView.setTranslationY(ScreenUtil.dp2px(0, holder.itemView.getContext()));
 
                     holder.itemView.animate()
                             .alpha(1)
@@ -265,11 +260,11 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
                 }
 
 
-
-                if (model.getStatus().equals("pending")) {
-                    pendingCount++;
-                    reportPending.setBadgeCount(pendingCount);
-                }
+                // FIXME: Nawawala ung icon
+//                if (model.getStatus().equals("pending")) {
+//                    pendingCount++;
+//                    reportPending.setBadgeCount(pendingCount);
+//                }
 
                 SimpleDateFormat sfd = new SimpleDateFormat("E h:mm a", Locale.getDefault());
                 String dateTime = sfd.format(new Date((Long) model.getTimestamp()));
@@ -316,7 +311,7 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
 
                 Log.e("REPORT DATE", dateTime);
                 Log.e("Number of respondee", msg);
-                holder.distance.setText(distanceInKilometer);
+                holder.distance.setText("Distance: " + distanceInKilometer);
                 holder.cardStatus.setCardBackgroundColor(color);
                 holder.status.setText(status);
                 holder.incident.setText(model.getIncident() + "   " + dateTime);
@@ -324,12 +319,7 @@ public class HomeActivity extends AppCompatActivity implements GoogleApiClient.C
 
                 final Intent intent = new Intent(HomeActivity.this, RespondActivity.class);
                 intent.putExtra("report", model);
-                holder.cardView.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        startActivity(intent);
-                    }
-                });
+                holder.cardView.setOnClickListener(v -> startActivity(intent));
             }
         };
 

@@ -14,23 +14,25 @@
 
     <RelativeLayout
         android:id="@+id/relativeLayout"
-        android:paddingLeft="16dp"
-        android:paddingRight="16dp"
+        android:paddingLeft="24dp"
+        android:paddingRight="24dp"
         android:clickable="true"
         android:focusable="true"
         android:foreground="?attr/selectableItemBackgroundBorderless"
-        android:background="#6200EE"
+        android:background="@color/colorDefaultTab"
         android:layout_width="match_parent"
         android:layout_height="66dp">
 
         <TextView
             android:id="@+id/text_report_details"
             android:layout_width="match_parent"
-            android:textSize="17sp"
+            android:textSize="18sp"
             android:textStyle="bold"
             android:layout_centerVertical="true"
             android:layout_alignParentLeft="true"
             android:text="Details of Report"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:fontFamily="@font/work_sans_medium"
             android:textColor="@android:color/white"
             android:layout_height="wrap_content"
             android:layout_alignParentStart="true" />
@@ -58,12 +60,16 @@
             android:layout_alignParentRight="true"
             android:layout_alignParentEnd="true"
             android:text="10km"
+            android:textAppearance="@style/TextAppearance.AppCompat.Caption"
+            android:fontFamily="@font/work_sans_light"
             android:textColor="@android:color/white"
             android:layout_height="wrap_content" />
 
     </RelativeLayout>
 
     <RelativeLayout
+        android:paddingLeft="24dp"
+        android:paddingRight="24dp"
         android:layout_width="match_parent"
         android:layout_height="66dp">
 
@@ -77,6 +83,7 @@
             android:layout_height="match_parent">
 
             <LinearLayout
+                android:id="@+id/layout_call_citizen"
                 android:clickable="true"
                 android:focusable="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -158,8 +165,8 @@
     </RelativeLayout>
 
     <RelativeLayout
-        android:paddingLeft="16dp"
-        android:paddingRight="16dp"
+        android:paddingLeft="24dp"
+        android:paddingRight="24dp"
         android:clickable="true"
         android:focusable="true"
         android:foreground="?attr/selectableItemBackground"
@@ -179,9 +186,11 @@
 
             <TextView
                 android:id="@+id/text_citizen_name"
-                android:textColor="@android:color/black"
                 android:text="Citizen Name"
                 android:layout_marginLeft="32dp"
+                android:textColor="@color/textColorPrimary"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                android:fontFamily="@font/work_sans_medium"
                 android:textSize="16sp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -192,6 +201,7 @@
     </RelativeLayout>
 
     <RelativeLayout
+        android:visibility="gone"
         android:clickable="true"
         android:focusable="true"
         android:foreground="?attr/selectableItemBackground"
@@ -199,8 +209,8 @@
         android:layout_height="48dp">
 
         <LinearLayout
-            android:paddingLeft="16dp"
-            android:paddingRight="16dp"
+            android:paddingLeft="24dp"
+            android:paddingRight="24dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:layout_width="match_parent"
@@ -213,7 +223,9 @@
 
             <TextView
                 android:id="@+id/text_citizen_phone"
-                android:textColor="@android:color/black"
+                android:textColor="@color/textColorPrimary"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                android:fontFamily="@font/work_sans_medium"
                 android:text="Citizen Phone"
                 android:layout_marginLeft="32dp"
                 android:textSize="16sp"
@@ -226,8 +238,8 @@
     </RelativeLayout>
 
     <RelativeLayout
-        android:paddingLeft="16dp"
-        android:paddingRight="16dp"
+        android:paddingLeft="24dp"
+        android:paddingRight="24dp"
         android:clickable="true"
         android:focusable="true"
         android:foreground="?attr/selectableItemBackground"
@@ -241,13 +253,15 @@
             android:layout_height="match_parent">
 
             <ImageView
-                app:srcCompat="@drawable/ic_label_black_24dp"
+                app:srcCompat="@drawable/iresponde_report_icon"
                 android:layout_width="24dp"
                 android:layout_height="24dp" />
 
             <TextView
                 android:id="@+id/text_incident_name"
-                android:textColor="@android:color/holo_red_light"
+                android:textColor="@color/textColorPrimary"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                android:fontFamily="@font/work_sans_bold"
                 android:text="Incident Name"
                 android:layout_marginLeft="32dp"
                 android:textSize="16sp"
@@ -260,8 +274,8 @@
     </RelativeLayout>
 
     <RelativeLayout
-        android:paddingLeft="16dp"
-        android:paddingRight="16dp"
+        android:paddingLeft="24dp"
+        android:paddingRight="24dp"
         android:clickable="true"
         android:focusable="true"
         android:foreground="?attr/selectableItemBackground"
@@ -301,8 +315,8 @@
         android:layout_height="48dp">
 
         <LinearLayout
-            android:paddingLeft="16dp"
-            android:paddingRight="16dp"
+            android:paddingLeft="24dp"
+            android:paddingRight="24dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:layout_width="match_parent"
@@ -326,6 +340,8 @@
         </LinearLayout>
 
         <View
+            android:layout_marginRight="24dp"
+            android:layout_marginLeft="24dp"
             android:layout_alignParentBottom="true"
             android:layout_width="match_parent"
             android:layout_height="0.5dp"
@@ -340,8 +356,8 @@
         android:layout_height="96dp">
         
         <LinearLayout
-            android:paddingLeft="16dp"
-            android:paddingRight="16dp"
+            android:paddingLeft="24dp"
+            android:paddingRight="24dp"
             android:orientation="horizontal"
             android:id="@+id/imageContainer"
             android:layout_width="wrap_content"
