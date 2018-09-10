@@ -4,12 +4,12 @@
         id="@+id/tab_reports"
         icon="@drawable/iresponde_report_icon"
         title="Reports"
-        barColorWhenSelected="@color/colorDefaultTab"
+        barColorWhenSelected="@color/colorProfileTab"
         />
     <tab
         id="@+id/tab_profile"
         icon="@drawable/iresponde_profile_icon"
         title="My Profile"
-        barColorWhenSelected="@color/colorProfileTab"
+        barColorWhenSelected="@color/colorDefaultTab"
         />
 </tabs>

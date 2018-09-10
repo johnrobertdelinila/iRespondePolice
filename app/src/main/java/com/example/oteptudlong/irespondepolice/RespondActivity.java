@@ -93,6 +93,7 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
     private static final int PERMISSION_REQUEST_CODE = 1996;
     private static final int GOOGLE_PLAY_SERVICES_REQUEST_CODE = 1997;
     private static final int CALL_REQUEST_CODE = 1998;
+    private static final LatLng marinduque = new LatLng(13.4767, 121.9032); // Center of Philippines
 
     // Data
     public Report report;
@@ -115,7 +116,7 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
     public LinearLayout bottomSheetLayout;
     public BottomSheetBehavior bottomSheetBehavior;
     public Button btn_send_report, btn_fake_report, btn_respond;
-    private SpotsDialog loadingDialog;
+    private android.app.AlertDialog loadingDialog;
     private RelativeLayout relativeLayout;
     private FloatingActionButton fab;
     private ImageView imageCar;
@@ -333,7 +334,7 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
 
     private void policeRespondentListener() {
         GeoLocation geoLocation = new GeoLocation(report.getLocation_latlng().get("latitude"), report.getLocation_latlng().get("longtitude"));
-        GeoQuery geoQuery = geoPoliceLocation.queryAtLocation(geoLocation, 0.6);
+        GeoQuery geoQuery = geoPoliceLocation.queryAtLocation(geoLocation, 0.2);
         geoQuery.addGeoQueryEventListener(this);
 
         Log.e("Location of Incident", String.valueOf(geoLocation));
@@ -345,7 +346,9 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
         bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetLayout);
         btn_send_report = findViewById(R.id.btn_send_report);
         btn_fake_report = findViewById(R.id.btn_fake_report);
-        loadingDialog = new SpotsDialog(this);
+        loadingDialog = new SpotsDialog.Builder()
+                .setContext(this)
+                .build();
         btn_respond = findViewById(R.id.btn_respond);
         geoPoliceLocation = new GeoFire(mPoliceLocation.child(policeUid));
         destination = new LatLng(report.getLocation_latlng().get("latitude"), report.getLocation_latlng().get("longtitude"));
@@ -400,14 +403,31 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
         mCitizenReport.child(report.getKey()).child("policeReports").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                boolean isAlreadyWriteReport = false;
+                String msg = "";
                 if (dataSnapshot.hasChild(policeUid)) {
                     // Already sended a report
                     // Ask first to remove the current police report
                     // TODO: Alert Dialog the confirmation to remove the report
-                    showDeletePoliceReport(dataSnapshot);
+                    isAlreadyWriteReport = true;
+                    msg = "You've already write a police report to this incident. Updating to fake report will " +
+                            "remove the report you created. Are you sure to consider it as fake report?";
                 }else {
-                    updateReportStatus();
+                    msg = "Are you sure to consider it as fake report?";
                 }
+                AlertDialog.Builder dialog = new AlertDialog.Builder(RespondActivity.this);
+                dialog.setTitle("Confirmation");
+                dialog.setMessage(msg);
+                boolean finalIsAlreadyWriteReport = isAlreadyWriteReport;
+                dialog.setPositiveButton("OK", (dialogInterface, i) -> {
+                    if (finalIsAlreadyWriteReport) {
+                        showDeletePoliceReport(dataSnapshot);
+                    }else {
+                        updateReportStatus();
+                    }
+                });
+                dialog.setNegativeButton("CANCEL", (dialogInterface, i) -> dialogInterface.dismiss());
+                dialog.show();
             }
 
             @Override
@@ -432,51 +452,48 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
         status.put("status", "faked");
         mCitizenReport.child(report.getKey()).updateChildren(status)
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(RespondActivity.this, "Considered as fake report.", Toast.LENGTH_SHORT).show();
                     // Add fake report to citizen
-//                        mCitizen.child(report.getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
-//                            @Override
-//                            public void onDataChange(DataSnapshot dataSnapshot) {
-//                                if (dataSnapshot.hasChild("fakeReports")) {
-//
-//                                }
-//                            }
-//
-//                            @Override
-//                            public void onCancelled(DatabaseError databaseError) {
-//
-//                            }
-//                        });
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
+                        mCitizen.child(report.getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
+                            @Override
+                            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                                DatabaseReference fakeReportRef = dataSnapshot.getRef().child("fakeReports");
+                                int value = 0;
+                                boolean isAlreadyWriteReport = false;
+                                if (dataSnapshot.hasChild("fakeReports") && dataSnapshot.child("fakeReports").getValue(Integer.class) != null) {
+                                    int currFakeReports = dataSnapshot.child("fakeReports").getValue(Integer.class);
+                                    isAlreadyWriteReport = true;
+                                    value = currFakeReports + 1;
+                                }
+                                if (isAlreadyWriteReport) {
+                                    fakeReportRef.setValue(value).addOnCompleteListener(task -> {
+                                        if (task.isSuccessful()) {
+                                            Toast.makeText(RespondActivity.this, "This report has been considered as faked.", Toast.LENGTH_SHORT).show();
+                                        }else if (task.getException() != null) {
+                                            Toast.makeText(RespondActivity.this, task.getException().getMessage(), Toast.LENGTH_LONG).show();
+                                        }
+                                    });
+                                }
+                            }
 
-                    }
+                            @Override
+                            public void onCancelled(@NonNull DatabaseError databaseError) {
+                                Toast.makeText(RespondActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 
     private void removePoliceReport(String policeReportID) {
         mPoliceReport.child(policeReportID).removeValue()
                 .addOnSuccessListener(aVoid -> mCitizenReport.child(report.getKey()).child("policeReports").child(policeUid).removeValue()
-                        .addOnSuccessListener(new OnSuccessListener<Void>() {
-                            @Override
-                            public void onSuccess(Void aVoid) {
-                                updateReportStatus();
-                            }
-                        })
-                        .addOnFailureListener(new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
+                        .addOnSuccessListener(aVoid1 -> updateReportStatus())
+                        .addOnFailureListener(e -> {
 
-                            }
                         }))
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Toast.makeText(RespondActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
-                });
+                .addOnFailureListener(e -> Toast.makeText(RespondActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
     private void fetchPoliceReport(String policeReportID) {
@@ -535,6 +552,9 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
                                 // TODO: Hide the Respond Button and Show the Write and Fake Button
                                 btn_send_report.setEnabled(true);
                                 btn_fake_report.setEnabled(true);
+
+                                btn_send_report.setTextColor(getResources().getColor(R.color.activeTextColor));
+                                btn_fake_report.setTextColor(getResources().getColor(R.color.activeTextColor));
                             }
                             break;
                         }
@@ -545,6 +565,8 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
                     actionContainer.animate().scaleX(0).scaleY(0).setDuration(150).start();
                     btn_send_report.setEnabled(false);
                     btn_fake_report.setEnabled(false);
+                    btn_send_report.setTextColor(getResources().getColor(R.color.colorTextFade));
+                    btn_fake_report.setTextColor(getResources().getColor(R.color.colorTextFade));
                     btn_respond.animate().scaleX(1).scaleY(1).setDuration(150).start();
                     btn_respond.bringToFront();
                 }
@@ -608,6 +630,7 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(marinduque, 4.7f));
 
         // Add Marker
         MarkerOptions markerOptionsDest = new MarkerOptions();
@@ -617,7 +640,7 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
         mMap.addMarker(markerOptionsDest);
 
         // Add Radius
-        double radiusInMeter = 300; // 0.6 km
+        double radiusInMeter = 200; // 0.3 km
         int strokeColor = 0xffff0000;
         int shadeColor = 0x44ff0000;
         CircleOptions circleOptions = new CircleOptions();
@@ -663,38 +686,35 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
 
             final LatLng origin = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
 
-            geoPoliceLocation.setLocation("Sakurako Oharo", new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()), new GeoFire.CompletionListener() {
-                @Override
-                public void onComplete(String key, DatabaseError error) {
+            geoPoliceLocation.setLocation("Sakurako Oharo", new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()), (key, error) -> {
 
-                    if (error == null) {
+                if (error == null) {
 
-                        MarkerOptions markerOptions = new MarkerOptions();
-                        markerOptions.position(origin);
-                        markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
-                        markerOptions.title("Your location");
+                    MarkerOptions markerOptions = new MarkerOptions();
+                    markerOptions.position(origin);
+                    markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
+                    markerOptions.title("Your location");
 
-                        if (markerOrigin != null) {
-                            markerOrigin.remove();
-                        }
-                        markerOrigin = mMap.addMarker(markerOptions);
-
-                        String url = getUrl(origin, destination);
-                        FetchUrl FetchUrl = new FetchUrl();
-                        FetchUrl.execute(url);
-
-                        LatLngBounds.Builder builder = new LatLngBounds.Builder();
-                        builder.include(origin);
-                        builder.include(destination);
-                        LatLngBounds bounds = builder.build();
-
-                        mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 240));
-
-                    }else {
-                        Toast.makeText(RespondActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
+                    if (markerOrigin != null) {
+                        markerOrigin.remove();
                     }
+                    markerOrigin = mMap.addMarker(markerOptions);
 
+                    String url = getUrl(origin, destination);
+//                    FetchUrl FetchUrl = new FetchUrl();
+//                    FetchUrl.execute(url);
+
+                    LatLngBounds.Builder builder = new LatLngBounds.Builder();
+                    builder.include(origin);
+                    builder.include(destination);
+                    LatLngBounds bounds = builder.build();
+
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 240));
+
+                }else {
+                    Toast.makeText(RespondActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
                 }
+
             });
 
         }
@@ -749,10 +769,11 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
         // Sensor enabled
         String sensor = "sensor=false";
 
-        String key = "key=AIzaSyC1_6q8cmLER1jrwvhb5dz3L0wXelRXXbA";
+//        String key = "key=AIzaSyC1_6q8cmLER1jrwvhb5dz3L0wXelRXXbA";
 
         // Building the parameters to the web service
-        String parameters = str_origin + "&" + str_dest + "&" + sensor + "&" + key;
+//        String parameters = str_origin + "&" + str_dest + "&" + sensor + "&" + key;
+        String parameters = str_origin + "&" + str_dest + "&" + sensor + "&";
 
         // Output format
         String output = "json";
@@ -796,7 +817,7 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
         mCitizenReport.child(report.getKey()).child("policeRespondee")
                 .addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
-                    public void onDataChange(DataSnapshot dataSnapshot) {
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                         if (dataSnapshot.hasChild(policeUid)) {
                             // Police is on the way
                             // Update it in arrived
@@ -811,7 +832,7 @@ public class RespondActivity extends AppCompatActivity implements OnMapReadyCall
                 });
     }
 
-    private void sendRespond(final String status) {
+    private void sendRespond(String status) {
         PoliceRespondee policeRespondee = new PoliceRespondee(policeName, status);
         mCitizenReport.child(report.getKey()).child("policeRespondee").child(policeUid).setValue(policeRespondee)
                 .addOnSuccessListener(aVoid -> {

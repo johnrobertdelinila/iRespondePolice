@@ -1,29 +1,22 @@
 package com.example.oteptudlong.irespondepolice;
 
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
+import android.content.Intent;
 import android.os.Bundle;
+import android.support.design.widget.TextInputEditText;
+import android.support.design.widget.TextInputLayout;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.Toast;
 
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.MutableData;
-import com.google.firebase.database.Transaction;
-
-import org.w3c.dom.Text;
 
 import java.text.DateFormat;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -33,15 +26,18 @@ import dmax.dialog.SpotsDialog;
 
 public class PoliceReportActivity extends AppCompatActivity {
 
-    private EditText case_no, incident, detail_of_event, actions_taken, witness;
+    private TextInputEditText case_no, incident, detail_of_event, actions_taken, witness;
+    private TextInputLayout layout_case_no, layout_incident, layout_detail_of_event, layout_actions_taken, layout_witness;
     private Button btn_submit;
     private DatabaseReference mPoliceReport = FirebaseDatabase.getInstance().getReference().child("Police Reports");
     private DatabaseReference mCitizenReport = FirebaseDatabase.getInstance().getReference().child("Citizen Reports");
     public String citizen_report_id;
     public Double latitude, longtitude;
-    private SpotsDialog loadingDialog;
+    private android.app.AlertDialog loadingDialog;
     private String policeUid = FirebaseAuth.getInstance().getCurrentUser().getUid();
     private String str_incident = "";
+
+    private List<String> titles;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,42 +45,80 @@ public class PoliceReportActivity extends AppCompatActivity {
         setContentView(R.layout.activity_police_report);
 
         init();
+        setUpToolbar();
 
         // TODO: Make title spinner
-
         Log.e("KEY", citizen_report_id);
 
-        btn_submit.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String str_case_no = case_no.getText().toString().trim();
-                str_incident = incident.getText().toString().trim();
-                String str_detail = detail_of_event.getText().toString().trim();
-                String str_action = actions_taken.getText().toString().trim();
-                String str_witness = witness.getText().toString().trim();
+        titles = new ArrayList<>();
+        titles.add("Rape");
+        titles.add("Fire");
+        titles.add("Near Miss");
+        titles.add("Road Accident");
+        titles.add("Theft");
+        titles.add("Property Damage");
+        titles.add("Others");
 
-                if (TextUtils.isEmpty(str_case_no)) {
-                    return;
-                }
-                if (TextUtils.isEmpty(str_incident)) {
-                    return;
-                }
-                if (TextUtils.isEmpty(str_detail)) {
-                    return;
-                }
-                if (TextUtils.isEmpty(str_action)) {
-                    return;
-                }
-                if (TextUtils.isEmpty(str_witness)) {
-                    return;
-                }
+        btn_submit.setOnClickListener(v -> {
+            String str_case_no = case_no.getText().toString().trim();
+            str_incident = incident.getText().toString().trim();
+            String str_detail = detail_of_event.getText().toString().trim();
+            String str_action = actions_taken.getText().toString().trim();
+            String str_witness = witness.getText().toString().trim();
 
-                loadingDialog.show();
-                insertReport(str_action, str_case_no, str_witness, str_detail, str_incident);
-
+            if (TextUtils.isEmpty(str_case_no)) {
+                layout_case_no.setError("Case id is required.");
+                return;
+            }else {
+                layout_case_no.setError(null);
             }
+            if (TextUtils.isEmpty(str_incident)) {
+                layout_incident.setError("Incident must not be empty.");
+                return;
+            }else {
+                layout_incident.setError(null);
+            }
+            if (!checkIfInTitles(str_incident)) {
+                layout_incident.setError("Please enter a valid incident name");
+                return;
+            }else {
+                layout_incident.setError(null);
+            }
+            if (TextUtils.isEmpty(str_detail)) {
+                layout_detail_of_event.setError("Detail of event is required.");
+                return;
+            }else {
+                layout_detail_of_event.setError(null);
+            }
+            if (TextUtils.isEmpty(str_action)) {
+                layout_actions_taken.setError("Action taken must not be empty.");
+                return;
+            }else {
+                layout_actions_taken.setError(null);
+            }
+            if (TextUtils.isEmpty(str_witness)) {
+                layout_witness.setError("Witness input must not be empty.");
+                return;
+            }else {
+                layout_witness.setError(null);
+            }
+
+            loadingDialog.show();
+            insertReport(str_action, str_case_no, str_witness, str_detail, str_incident);
+
         });
 
+    }
+
+    private boolean checkIfInTitles(String customTitle) {
+        boolean nadaliBa = false;
+        for (String title: titles) {
+            if (title.equalsIgnoreCase(customTitle)) {
+                nadaliBa = true;
+                break;
+            }
+        }
+        return nadaliBa;
     }
 
     private void insertReport(String str_action, String str_case_no, String str_witness, String str_detail, String str_incident) {
@@ -104,15 +138,12 @@ public class PoliceReportActivity extends AppCompatActivity {
         policeReport.setPolice_id(policeUid);
         policeReport.setIncident(str_incident);
 
-        mPoliceReport.push().setValue(policeReport, new DatabaseReference.CompletionListener() {
-            @Override
-            public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
-                if (databaseError == null) {
-                    insertPoliceReportID(databaseReference.getKey());
-                }else {
-                    loadingDialog.dismiss();
-                    Toast.makeText(PoliceReportActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                }
+        mPoliceReport.push().setValue(policeReport, (databaseError, databaseReference) -> {
+            if (databaseError == null) {
+                insertPoliceReportID(databaseReference.getKey());
+            }else {
+                loadingDialog.dismiss();
+                Toast.makeText(PoliceReportActivity.this, databaseError.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -121,18 +152,10 @@ public class PoliceReportActivity extends AppCompatActivity {
         Map<String, Object> policeReport = new HashMap<>();
         policeReport.put(policeUid, policeReportID);
         mCitizenReport.child(citizen_report_id).child("policeReports").updateChildren(policeReport)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        updateReportStatus();
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        loadingDialog.dismiss();
-                        Toast.makeText(PoliceReportActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
+                .addOnSuccessListener(aVoid -> updateReportStatus())
+                .addOnFailureListener(e -> {
+                    loadingDialog.dismiss();
+                    Toast.makeText(PoliceReportActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 
@@ -141,20 +164,16 @@ public class PoliceReportActivity extends AppCompatActivity {
         status.put("status", "resolved");
         status.put("title", str_incident);
         mCitizenReport.child(citizen_report_id).updateChildren(status)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        loadingDialog.dismiss();
-                        Toast.makeText(PoliceReportActivity.this, "Report has been successfully inserted", Toast.LENGTH_SHORT).show();
-                        finish();
-                    }
+                .addOnSuccessListener(aVoid -> {
+                    loadingDialog.dismiss();
+                    Toast.makeText(PoliceReportActivity.this, "Report has been successfully wrote.", Toast.LENGTH_LONG).show();
+                    Intent intent = new Intent(PoliceReportActivity.this, HomeActivity.class);
+                    finish();
+                    startActivity(intent);
                 })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        loadingDialog.dismiss();
-                        Toast.makeText(PoliceReportActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
+                .addOnFailureListener(e -> {
+                    loadingDialog.dismiss();
+                    Toast.makeText(PoliceReportActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 
@@ -168,10 +187,25 @@ public class PoliceReportActivity extends AppCompatActivity {
         witness = findViewById(R.id.edit_witness);
         btn_submit = findViewById(R.id.btn_submit);
 
+        layout_case_no = findViewById(R.id.textInput_case_no);
+        layout_incident = findViewById(R.id.textInput_incident);
+        layout_detail_of_event = findViewById(R.id.textInput_detail);
+        layout_actions_taken = findViewById(R.id.textInput_actions);
+        layout_witness = findViewById(R.id.textInput_witness);
+
         citizen_report_id = getIntent().getExtras().getString("key");
         latitude = getIntent().getExtras().getDouble("latitude");
         longtitude = getIntent().getExtras().getDouble("longtitude");
 
-        loadingDialog = new SpotsDialog(this);
+        loadingDialog = new SpotsDialog.Builder()
+                .setContext(this)
+                .build();
     }
+
+    private void setUpToolbar() {
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        toolbar.setNavigationOnClickListener(view -> onBackPressed());
+    }
+
 }

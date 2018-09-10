@@ -22,7 +22,7 @@
             android:text="Reports"
             android:textAppearance="@style/TextAppearanceTitle"
             android:fontFamily="@font/work_sans_semibold"
-            android:textColor="@color/colorAccent"
+            android:textColor="#2B3D4B"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             tools:targetApi="lollipop" />
@@ -35,22 +35,28 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-            <android.support.v7.widget.RecyclerView
-                android:id="@+id/firebaseRecyclerview"
-                android:requiresFadingEdge="vertical"
+            <!--<android.support.v7.widget.RecyclerView-->
+                <!--android:id="@+id/firebaseRecyclerview"-->
+                <!--android:requiresFadingEdge="vertical"-->
+                <!--android:layout_width="match_parent"-->
+                <!--android:layout_height="match_parent" />-->
+
+            <FrameLayout
+                android:id="@+id/container"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" />
+                android:layout_height="match_parent"
+                tools:context=".HomeActivity" />
 
         </android.support.v4.widget.NestedScrollView>
 
     </LinearLayout>
 
-    <ProgressBar
-        android:id="@+id/progresBar"
-        style="?android:attr/progressBarStyleLarge"
-        android:layout_gravity="center"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
+    <!--<ProgressBar-->
+        <!--android:id="@+id/progresBar"-->
+        <!--style="?android:attr/progressBarStyleLarge"-->
+        <!--android:layout_gravity="center"-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="wrap_content" />-->
 
     <com.roughike.bottombar.BottomBar
         android:id="@+id/bottomBar"

@@ -32,7 +32,7 @@ public class LoginActivity extends AppCompatActivity {
     private TextInputLayout textInput_email, textInput_password;
     private FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private DatabaseReference mPolice = FirebaseDatabase.getInstance().getReference().child("Police");
-    private SpotsDialog loadingDialog;
+    private android.app.AlertDialog loadingDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,7 +103,9 @@ public class LoginActivity extends AppCompatActivity {
         edit_password = findViewById(R.id.edit_password);
         textInput_email = findViewById(R.id.textInput_email);
         textInput_password = findViewById(R.id.textInput_password);
-        loadingDialog = new SpotsDialog(this);
+        loadingDialog = new SpotsDialog.Builder()
+                .setContext(this)
+                .build();
     }
 
 }

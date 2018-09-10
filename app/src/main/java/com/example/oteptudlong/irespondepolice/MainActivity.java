@@ -21,22 +21,19 @@ public class MainActivity extends AppCompatActivity {
 
         init();
 
-        btn_login.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String idNumber = edit_idNumber.getText().toString().trim();
-                String password = edit_password.getText().toString().trim();
+        btn_login.setOnClickListener(v -> {
+            String idNumber = edit_idNumber.getText().toString().trim();
+            String password = edit_password.getText().toString().trim();
 
-                if (TextUtils.isEmpty(idNumber)) {
-                    return;
-                }
-                if (TextUtils.isEmpty(password)) {
-                    return;
-                }
-
-                // authentication of police
-
+            if (TextUtils.isEmpty(idNumber)) {
+                return;
             }
+            if (TextUtils.isEmpty(password)) {
+                return;
+            }
+
+            // authentication of police
+
         });
 
     }

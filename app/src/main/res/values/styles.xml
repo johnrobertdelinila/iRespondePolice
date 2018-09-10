@@ -84,4 +84,21 @@
         <item name="android:textSize">15sp</item>
     </style>
 
+    <style name="errorAppearance" parent="@android:style/TextAppearance">
+        <item name="android:textColor">@color/colorTextError</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="Widget.iResponde.Toolbar" parent="Widget.AppCompat.Toolbar">
+        <item name="android:background">@color/colorPrimary</item>
+        <item name="android:theme">@style/AppTheme</item>
+        <item name="titleTextAppearance">@style/TextAppearance.iResponde.Toolbar</item>
+    </style>
+
+    <style name="TextAppearance.iResponde.Toolbar" parent="TextAppearance.MaterialComponents.Headline1">
+        <item name="android:textSize">20sp</item>
+        <item name="android:fontFamily">@font/work_sans_medium</item>
+        <item name="android:textColor">@android:color/white</item>
+    </style>
+
 </resources>
